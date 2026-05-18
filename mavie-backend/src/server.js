@@ -1,8 +1,10 @@
-const pool = require("./db");
 const express = require("express");
 const cors = require("cors");
-const authRoutes = require("./routes/auth.routes");
 require("dotenv").config();
+
+const pool = require("./db");
+const authRoutes = require("./routes/auth.routes");
+const medicationRoutes = require("./routes/medication.routes");
 
 const app = express();
 
@@ -41,6 +43,7 @@ app.get("/db-test", async (req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/medications", medicationRoutes);
 
 app.listen(PORT, () => {
   console.log(`MaVie backend server running on port ${PORT}`);
