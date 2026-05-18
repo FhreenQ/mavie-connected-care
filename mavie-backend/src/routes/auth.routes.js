@@ -2,8 +2,10 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../db");
+const authMiddleware = require("../middleware/auth.middleware");
 
 const router = express.Router();
+
 
 // Register new user
 router.post("/register", async (req, res) => {
@@ -120,4 +122,34 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// Get current logged-in user
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT user_id, username, email, role, timezone, created_at
+       FROM users
+       WHERE user_id = $1`,
+      [req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      message: "Current user retrieved successfully",
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({
+      message: "Server error while retrieving current user",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
+
