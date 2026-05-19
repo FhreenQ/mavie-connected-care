@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
-} from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { saveUserMedication } from "./medicineApi";
 
 const frequencyOptions = ["once daily", "twice daily", "three times daily", "once weekly", "as written on prescription"];
@@ -38,23 +30,35 @@ export default function ManualMedicineInputScreen({ navigation }) {
     setIsSaving(true);
     setError("");
 
-    try {
-      await saveUserMedication({
-        medicationName: form.medicineName.trim(),
-        genericName: form.medicineName.trim(),
-        dosageStrength: form.strength.trim(),
-        frequency: form.frequency,
-        mealTiming: form.mealTiming,
-        instruction: "",
-        notes: form.notes.trim(),
-        startDate: form.startDate.trim(),
-        endDate: form.endDate.trim() || null,
-        source: "MANUAL",
-        confirmedByUser: true
-      });
+  try {
+   Alert.alert("Manual screen test", "handleSave is running");
+
+   const savedResult = await saveUserMedication({
+    medicationName: form.medicineName.trim(),
+    genericName: form.medicineName.trim(),
+    dosageStrength: form.strength.trim(),
+    frequency: form.frequency,
+    mealTiming: form.mealTiming,
+    instruction: "",
+    notes: form.notes.trim(),
+    startDate: form.startDate.trim(),
+    endDate: form.endDate.trim() || null,
+    source: "MANUAL",
+    confirmedByUser: true
+  });
+
+  Alert.alert(
+    "Saved result",
+    JSON.stringify(savedResult, null, 2).slice(0, 900)
+  );
       navigation.navigate("Medication");
-    } catch {
-      setError("Could not save this medicine. Please check the backend connection and try again.");
+    } catch (error) {
+      console.log("Manual save error:", error);
+      Alert.alert("Save error", error.message || String(error));
+      setError(
+	error.message ||
+		"Could not save this medicine. Please check the backend connection and try again."
+      );
     } finally {
       setIsSaving(false);
     }

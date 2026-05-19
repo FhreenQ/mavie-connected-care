@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -116,15 +117,29 @@ export default function AiMedicineScannerScreen({ navigation }) {
       }
     };
 
-    try {
-      await saveUserMedication(payload);
-      setSuccess("Medicine added to schedule.");
-      navigation.navigate("Medication");
-    } catch {
-      setError("Could not save this medicine. Please check the backend connection and try again.");
-    } finally {
-      setIsSaving(false);
-    }
+  try {
+    Alert.alert("AI screen test", "handleSave is running");
+    console.log("AI handleSave payload:", payload);
+
+    const savedResult = await saveUserMedication(payload);
+
+    Alert.alert(
+      "Saved result",
+      JSON.stringify(savedResult, null, 2).slice(0, 900)
+  );
+
+    setSuccess("Medicine added to schedule.");
+    navigation.navigate("Medication");
+}   catch (error) {
+    console.log("AI save error:", error);
+    Alert.alert("Save error", error.message || String(error));
+    setError(
+      error.message ||
+        "Could not save this medicine. Please check the backend connection and try again."
+  );
+} finally {
+  setIsSaving(false);
+}
   }
 
   const topPredictionText = useMemo(() => {

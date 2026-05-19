@@ -97,8 +97,9 @@
 //   },
 // });
 
-import React, { useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { getUserMedications } from '../../components/medicine-scanner/medicineApi';
 
 import {
   Alert,
@@ -149,6 +150,29 @@ const patientInfo = {
   address: 'Seoul, South Korea',
 };
 
+function mapBackendScheduleToMedication(schedule: any) {
+  const nextDoseDate = schedule.next_dose_time
+    ? new Date(schedule.next_dose_time)
+    : null;
+
+  const time = nextDoseDate
+    ? nextDoseDate.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'No time';
+
+  return {
+    id: String(schedule.schedule_id),
+    name: schedule.brand_name || schedule.generic_name || 'Unknown medicine',
+    dose: schedule.dosage || schedule.strength || 'As instructed',
+    time,
+    instruction: schedule.instructions || 'No instruction added',
+    benefit: 'Saved from backend schedule',
+    status: 'Pending',
+  };
+}
+
 export default function App() {
   const router = useRouter();
 
@@ -163,6 +187,26 @@ export default function App() {
     instruction: '',
     benefit: '',
   });
+
+  const loadBackendMedications = async () => {
+    try {
+      const schedules = await getUserMedications();
+      const backendMedications = schedules.map(mapBackendScheduleToMedication);
+      setMedications(backendMedications);
+    } catch (error: any) {
+      console.log('Load backend medications error:', error);
+      Alert.alert(
+        'Backend load error',
+        error.message || 'Could not load medications from backend.'
+      );
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBackendMedications();
+    }, [])
+  );
 
   const stats = useMemo(() => {
     const taken = medications.filter((med) => med.status === 'Taken').length;
@@ -215,11 +259,11 @@ export default function App() {
     if (activeTab === 'Medication') {
       return (
         <MedicationScreen
-          medications={medications}
-          markMedication={markMedication}
-          openAddModal={() => setShowAddModal(true)}
-          openScanner={() => router.push('/add-medicine' as any)}
-        />
+  	   medications={medications}
+  	   markMedication={markMedication}
+  	   openAddModal={() => router.push('/add-medicine' as any)}
+  	   openScanner={() => router.push('/add-medicine' as any)}
+	/>
       );
     }
 

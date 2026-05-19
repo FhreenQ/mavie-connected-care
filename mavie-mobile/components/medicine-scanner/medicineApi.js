@@ -1,70 +1,171 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "";
-let localMedicationStore = [];
+import { Alert } from "react-native";
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const DEV_EMAIL = process.env.EXPO_PUBLIC_DEV_EMAIL;
+const DEV_PASSWORD = process.env.EXPO_PUBLIC_DEV_PASSWORD;
+
+let cachedToken = null;
 
 function hasBackend() {
-  return Boolean(API_BASE_URL && !API_BASE_URL.includes("YOUR_BACKEND_URL_HERE"));
+  return Boolean(API_BASE_URL);
+}
+
+function getFrequencyHours(frequency) {
+  const value = String(frequency || "").toLowerCase();
+
+  if (value.includes("once weekly")) return 168;
+  if (value.includes("three times")) return 8;
+  if (value.includes("twice")) return 12;
+  if (value.includes("once daily")) return 24;
+
+  return 24;
+}
+
+function makeManualMedicationId(medicineName, strength) {
+  const safeName = String(medicineName || "MED")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  const safeStrength = String(strength || "GEN")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return `MANUAL-${safeName}-${safeStrength}`.slice(0, 20);
+}
+
+function buildNextDoseTime(startDate) {
+  const safeDate = startDate || new Date().toISOString().slice(0, 10);
+
+  // For now, we set first dose time to 9 AM Korea time.
+  // Later, we can add a time picker in the app.
+  return `${safeDate}T09:00:00+09:00`;
+}
+
+async function loginForDevToken() {
+  if (cachedToken) {
+    return cachedToken;
+  }
+
+  if (!DEV_EMAIL || !DEV_PASSWORD) {
+    throw new Error("Missing EXPO_PUBLIC_DEV_EMAIL or EXPO_PUBLIC_DEV_PASSWORD in mavie-mobile/.env");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: DEV_EMAIL,
+      password: DEV_PASSWORD,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Login failed");
+  }
+
+  cachedToken = data.token;
+  return cachedToken;
+}
+
+async function apiRequest(path, options = {}) {
+  if (!hasBackend()) {
+    throw new Error("No backend URL configured. Please set EXPO_PUBLIC_API_BASE_URL.");
+  }
+
+  console.log("API request:", `${API_BASE_URL}${path}`);
+
+  const token = await loginForDevToken();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Backend request failed");
+  }
+
+  return data;
 }
 
 export async function saveUserMedication(payload) {
-  if (!hasBackend()) {
-    const saved = {
-      id: `local-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      ...payload
-    };
-    localMedicationStore = [saved, ...localMedicationStore];
-    return saved;
+  Alert.alert("Backend test", `Using API: ${API_BASE_URL}`);
+  console.log("saveUserMedication called with:", payload);
+  console.log("API_BASE_URL:", API_BASE_URL);
+
+  const rxnormId = makeManualMedicationId(
+    payload.medicationName || payload.genericName,
+    payload.dosageStrength
+  );
+
+  const genericName = payload.genericName || payload.medicationName;
+  const brandName = payload.medicationName;
+  const strength = payload.dosageStrength;
+  const form = "manual";
+
+  // Step 1: Save medicine into medication catalog
+  try {
+    await apiRequest("/medications", {
+      method: "POST",
+      body: JSON.stringify({
+        rxnormId,
+        genericName,
+        brandName,
+        form,
+        strength,
+      }),
+    });
+  } catch (error) {
+    // If medication already exists, continue to create schedule.
+    if (!String(error.message).includes("already exists")) {
+      throw error;
+    }
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/user-medications`, {
+  // Step 2: Save user schedule
+  const frequencyHours = getFrequencyHours(payload.frequency);
+  const nextDoseTime = buildNextDoseTime(payload.startDate);
+
+  const scheduleResponse = await apiRequest("/schedules", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      rxnormId,
+      dosage: strength || "As instructed",
+      instructions: [payload.mealTiming, payload.notes]
+        .filter(Boolean)
+        .join(". "),
+      frequencyHours,
+      startDate: payload.startDate,
+      endDate: payload.endDate || null,
+      nextDoseTime,
+    }),
   });
 
-  if (!response.ok) {
-    throw new Error("Could not save medicine to schedule.");
-  }
-
-  return response.json();
+  return scheduleResponse.schedule;
 }
 
 export async function getUserMedications() {
-  if (!hasBackend()) {
-    return localMedicationStore;
-  }
+  const response = await apiRequest("/schedules", {
+    method: "GET",
+  });
 
-  const response = await fetch(`${API_BASE_URL}/api/user-medications`);
-
-  if (!response.ok) {
-    throw new Error("Could not load medicines.");
-  }
-
-  return response.json();
+  return response.schedules || [];
 }
 
-export async function scanMedicineImageWithBackend(imageAsset) {
-  if (!hasBackend()) {
-    throw new Error("No backend URL configured. Using local demo scanner instead.");
-  }
-
-  const formData = new FormData();
-  formData.append("image", {
-    uri: imageAsset.uri,
-    name: imageAsset.fileName || "medicine-photo.jpg",
-    type: imageAsset.mimeType || "image/jpeg"
-  });
-
-  const response = await fetch(`${API_BASE_URL}/api/medicine-scanner/scan`, {
-    method: "POST",
-    body: formData
-  });
-
-  if (!response.ok) {
-    throw new Error("Could not scan medicine image.");
-  }
-
-  return response.json();
+export async function scanMedicineImageWithBackend() {
+  throw new Error("AI medicine scanning will be connected later.");
 }
