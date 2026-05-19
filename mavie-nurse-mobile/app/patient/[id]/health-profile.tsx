@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -5,6 +6,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  TextInput,
+  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -14,8 +17,18 @@ export default function HealthProfileScreen() {
   const { id } = useLocalSearchParams();
   const patientId = Array.isArray(id) ? id[0] : String(id ?? "");
 
-  const { patients } = usePatients();
+  const { patients, updatePatient } = usePatients();
   const patient = patients.find((item) => item.id === patientId);
+
+  const [isEditing, setIsEditing] = useState(false);
+
+  const [name, setName] = useState(patient?.name ?? "");
+  const [age, setAge] = useState(patient?.age ?? "");
+  const [gender, setGender] = useState(patient?.gender ?? "");
+  const [condition, setCondition] = useState(patient?.condition ?? "");
+  const [room, setRoom] = useState(patient?.room ?? "");
+  const [allergies, setAllergies] = useState(patient?.allergies ?? "");
+  const [notes, setNotes] = useState(patient?.notes ?? "");
 
   if (!patient) {
     return (
@@ -34,6 +47,38 @@ export default function HealthProfileScreen() {
     );
   }
 
+  const handleSave = () => {
+    if (!name || !age || !condition) {
+      Alert.alert("Missing Information", "Please fill in name, age, and condition.");
+      return;
+    }
+
+    updatePatient(patient.id, {
+      name,
+      age,
+      gender,
+      condition,
+      room,
+      allergies,
+      emergencyContact: patient.emergencyContact,
+      notes,
+    });
+
+    setIsEditing(false);
+    Alert.alert("Saved", "Patient health profile has been updated.");
+  };
+
+  const handleCancel = () => {
+    setName(patient.name);
+    setAge(patient.age);
+    setGender(patient.gender);
+    setCondition(patient.condition);
+    setRoom(patient.room);
+    setAllergies(patient.allergies);
+    setNotes(patient.notes);
+    setIsEditing(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -41,8 +86,21 @@ export default function HealthProfileScreen() {
           <Text style={styles.backText}>← Back to Patient</Text>
         </TouchableOpacity>
 
-        <Text style={styles.pageTitle}>Health Profile</Text>
-        <Text style={styles.subtitle}>{patient.name}</Text>
+        <View style={styles.rowBetween}>
+          <View>
+            <Text style={styles.pageTitle}>Health Profile</Text>
+            <Text style={styles.subtitle}>{patient.name}</Text>
+          </View>
+
+          {!isEditing && (
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => setIsEditing(true)}
+            >
+              <Text style={styles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={styles.profileHeader}>
           <View style={styles.avatarCircle}>
@@ -59,32 +117,107 @@ export default function HealthProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Basic Information</Text>
-          <Text style={styles.infoText}>Name: {patient.name}</Text>
-          <Text style={styles.infoText}>Age: {patient.age}</Text>
-          <Text style={styles.infoText}>Gender: {patient.gender}</Text>
-          <Text style={styles.infoText}>Room / Ward: {patient.room}</Text>
-        </View>
+        {isEditing ? (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Edit Basic Information</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Medical Information</Text>
-          <Text style={styles.infoText}>Condition: {patient.condition}</Text>
-          <Text style={styles.infoText}>Allergies: {patient.allergies}</Text>
-          <Text style={styles.infoText}>Medication Status: {patient.medicationStatus}</Text>
-        </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Patient name"
+                value={name}
+                onChangeText={setName}
+              />
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Nurse Notes</Text>
-          <Text style={styles.infoText}>{patient.notes}</Text>
-        </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Age"
+                value={age}
+                onChangeText={setAge}
+                keyboardType="numeric"
+              />
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Emergency Information</Text>
-          <Text style={styles.infoText}>
-            Emergency Contact: {patient.emergencyContact}
-          </Text>
-        </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Gender"
+                value={gender}
+                onChangeText={setGender}
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Room / Ward"
+                value={room}
+                onChangeText={setRoom}
+              />
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Edit Medical Information</Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Condition"
+                value={condition}
+                onChangeText={setCondition}
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Allergies"
+                value={allergies}
+                onChangeText={setAllergies}
+              />
+
+              <TextInput
+                style={[styles.input, styles.notesInput]}
+                placeholder="Nurse notes"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+              />
+            </View>
+
+            <TouchableOpacity style={styles.primaryButton} onPress={handleSave}>
+              <Text style={styles.primaryButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleCancel}>
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Basic Information</Text>
+              <Text style={styles.infoText}>Name: {patient.name}</Text>
+              <Text style={styles.infoText}>Age: {patient.age}</Text>
+              <Text style={styles.infoText}>Gender: {patient.gender}</Text>
+              <Text style={styles.infoText}>Room / Ward: {patient.room}</Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Medical Information</Text>
+              <Text style={styles.infoText}>Condition: {patient.condition}</Text>
+              <Text style={styles.infoText}>Allergies: {patient.allergies}</Text>
+              <Text style={styles.infoText}>
+                Medication Status: {patient.medicationStatus}
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Nurse Notes</Text>
+              <Text style={styles.infoText}>{patient.notes}</Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Emergency Information</Text>
+              <Text style={styles.infoText}>
+                Primary Contact: {patient.emergencyContact}
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -108,6 +241,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 16,
+  },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   pageTitle: {
     fontSize: 28,
@@ -169,16 +307,51 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     marginBottom: 5,
   },
+  input: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    padding: 15,
+    marginBottom: 14,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  notesInput: {
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  editButton: {
+    backgroundColor: "#E0F2FE",
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+  },
+  editButtonText: {
+    color: "#2E6F9E",
+    fontWeight: "bold",
+  },
   primaryButton: {
     backgroundColor: "#2E6F9E",
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
-    marginTop: 18,
+    marginTop: 8,
   },
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 17,
+    fontWeight: "bold",
+  },
+  secondaryButton: {
+    backgroundColor: "#E5E7EB",
+    borderRadius: 14,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  secondaryButtonText: {
+    color: "#374151",
+    fontSize: 16,
     fontWeight: "bold",
   },
 });

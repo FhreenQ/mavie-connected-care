@@ -75,7 +75,7 @@ export default function PatientDetailScreen() {
           <Text style={styles.infoText}>Room: {patient.room}</Text>
           <Text style={styles.infoText}>Allergies: {patient.allergies}</Text>
           <Text style={styles.infoText}>
-            Emergency Contact: {patient.emergencyContact}
+            Emergency Contacts: {patient.emergencyContacts?.length ?? 0}
           </Text>
           <Text style={styles.infoText}>Nurse Notes: {patient.notes}</Text>
         </View>

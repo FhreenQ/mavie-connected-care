@@ -14,6 +14,12 @@ export type Medicine = {
   status: "Taken" | "Pending" | "Missed";
 };
 
+export type EmergencyContact = {
+  name: string;
+  relationship: string;
+  phone: string;
+};
+
 export type Patient = {
   id: string;
   name: string;
@@ -23,6 +29,7 @@ export type Patient = {
   room: string;
   medicationStatus: string;
   emergencyContact: string;
+  emergencyContacts: EmergencyContact[];
   allergies: string;
   notes: string;
   medicines: Medicine[];

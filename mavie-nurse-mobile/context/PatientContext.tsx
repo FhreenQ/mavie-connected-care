@@ -5,6 +5,7 @@ import {
   mockNurse,
   Nurse,
   Medicine,
+  EmergencyContact,
 } from "../data/mockNurseData";
 
 type NewPatientInput = {
@@ -33,6 +34,16 @@ type PatientContextType = {
   addPatient: (patient: NewPatientInput) => void;
   updatePatient: (patientId: string, updatedInfo: EditablePatientInfo) => void;
   updateEmergencyContact: (patientId: string, emergencyContact: string) => void;
+  addEmergencyContact: (
+    patientId: string,
+    emergencyContact: EmergencyContact
+  ) => void;
+  updateEmergencyContactAtIndex: (
+    patientId: string,
+    contactIndex: number,
+    emergencyContact: EmergencyContact
+  ) => void;
+  deleteEmergencyContact: (patientId: string, contactIndex: number) => void;
   updateMedicationStatus: (
     patientId: string,
     medicineIndex: number,
@@ -57,6 +68,10 @@ function getMedicationSummary(medicines: Medicine[]) {
   return `${taken}/${medicines.length} taken today`;
 }
 
+function formatPrimaryContact(contact: EmergencyContact) {
+  return `${contact.relationship} - ${contact.phone}`;
+}
+
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const [nurse, setNurse] = useState<Nurse>(mockNurse);
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
@@ -75,6 +90,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       room: patient.room || "Not assigned",
       medicationStatus: "No medication record yet",
       emergencyContact: "Not added yet",
+      emergencyContacts: [],
       allergies: "Not added yet",
       notes: "No nurse notes yet.",
       medicines: [],
@@ -109,6 +125,84 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
             }
           : patient
       )
+    );
+  };
+
+  const addEmergencyContact = (
+    patientId: string,
+    emergencyContact: EmergencyContact
+  ) => {
+    setPatients((prevPatients) =>
+      prevPatients.map((patient) => {
+        if (patient.id !== patientId) {
+          return patient;
+        }
+
+        const updatedContacts = [
+          ...(patient.emergencyContacts ?? []),
+          emergencyContact,
+        ];
+
+        return {
+          ...patient,
+          emergencyContacts: updatedContacts,
+          emergencyContact:
+            updatedContacts.length === 1
+              ? formatPrimaryContact(emergencyContact)
+              : patient.emergencyContact,
+        };
+      })
+    );
+  };
+
+  const updateEmergencyContactAtIndex = (
+    patientId: string,
+    contactIndex: number,
+    emergencyContact: EmergencyContact
+  ) => {
+    setPatients((prevPatients) =>
+      prevPatients.map((patient) => {
+        if (patient.id !== patientId) {
+          return patient;
+        }
+
+        const updatedContacts = (patient.emergencyContacts ?? []).map(
+          (contact, index) =>
+            index === contactIndex ? emergencyContact : contact
+        );
+
+        return {
+          ...patient,
+          emergencyContacts: updatedContacts,
+          emergencyContact:
+            contactIndex === 0
+              ? formatPrimaryContact(emergencyContact)
+              : patient.emergencyContact,
+        };
+      })
+    );
+  };
+
+  const deleteEmergencyContact = (patientId: string, contactIndex: number) => {
+    setPatients((prevPatients) =>
+      prevPatients.map((patient) => {
+        if (patient.id !== patientId) {
+          return patient;
+        }
+
+        const updatedContacts = (patient.emergencyContacts ?? []).filter(
+          (_, index) => index !== contactIndex
+        );
+
+        return {
+          ...patient,
+          emergencyContacts: updatedContacts,
+          emergencyContact:
+            updatedContacts.length > 0
+              ? formatPrimaryContact(updatedContacts[0])
+              : "Not added yet",
+        };
+      })
     );
   };
 
@@ -150,6 +244,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         addPatient,
         updatePatient,
         updateEmergencyContact,
+        addEmergencyContact,
+        updateEmergencyContactAtIndex,
+        deleteEmergencyContact,
         updateMedicationStatus,
       }}
     >
