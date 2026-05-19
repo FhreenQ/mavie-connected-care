@@ -1,10 +1,10 @@
 import { useParams, Link } from "react-router-dom";
-import { patients } from "../data/patients.js";
+import { getPatientById } from "../data/patients";
 
 function PatientDetails() {
   const { id } = useParams();
 
-  const patient = patients.find((item) => item.id === Number(id));
+  const patient = getPatientById(id);
 
   if (!patient) {
     return (

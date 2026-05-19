@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
 import PatientDetails from "./pages/PatientDetails";
+import AddPatient from "./pages/AddPatient";
 import Medications from "./pages/Medications";
 import Schedules from "./pages/Schedules";
 import EmergencyAlerts from "./pages/EmergencyAlerts";
@@ -17,6 +18,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/patients" element={<Patients />} />
+          <Route path="/patients/add" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetails />} />
           <Route path="/medications" element={<Medications />} />
           <Route path="/schedules" element={<Schedules />} />

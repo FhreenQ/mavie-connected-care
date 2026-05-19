@@ -1,7 +1,14 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { patients } from "../data/patients";
+import { getPatients } from "../data/patients";
 
 function Patients() {
+  const [patients, setPatients] = useState([]);
+
+  useEffect(() => {
+    setPatients(getPatients());
+  }, []);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -10,7 +17,9 @@ function Patients() {
           <p>Manage registered patients and monitor their medication status.</p>
         </div>
 
-        <button className="primary-btn">+ Add Patient</button>
+        <Link to="/patients/add" className="primary-btn">
+          + Add Patient
+        </Link>
       </div>
 
       <div className="table-card">
