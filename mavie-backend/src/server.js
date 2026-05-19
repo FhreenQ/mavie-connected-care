@@ -7,6 +7,7 @@ const authRoutes = require("./routes/auth.routes");
 const medicationRoutes = require("./routes/medication.routes");
 const scheduleRoutes = require("./routes/schedule.routes");
 const medicationLogRoutes = require("./routes/medicationLog.routes");
+const careLinkRoutes = require("./routes/careLink.routes");
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use("/auth", authRoutes);
 app.use("/medications", medicationRoutes);
 app.use("/schedules", scheduleRoutes);
 app.use("/medication-logs", medicationLogRoutes);
+app.use("/care-links", careLinkRoutes);
 
 app.listen(PORT, () => {
   console.log(`MaVie backend server running on port ${PORT}`);
