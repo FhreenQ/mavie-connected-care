@@ -17,6 +17,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
 app.get("/", (req, res) => {
   res.json({
     message: "MaVie backend is running",
@@ -29,8 +34,6 @@ app.get("/health", (req, res) => {
     service: "MaVie Backend",
   });
 });
-
-const PORT = process.env.PORT || 5000;
 
 app.get("/db-test", async (req, res) => {
   try {
@@ -57,6 +60,21 @@ app.use("/emergency-contacts", emergencyContactRoutes);
 app.use("/emergency-alerts", emergencyAlertRoutes);
 app.use("/health-profile", healthProfileRoutes);
 
-app.listen(PORT, () => {
-  console.log(`MaVie backend server running on port ${PORT}`);
+const PORT = Number(process.env.PORT) || 5000;
+
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`MaVie backend server running on http://0.0.0.0:${PORT}`);
+});
+
+server.on("error", (error) => {
+  console.error("Server error:", error);
+});
+
+const keepAlive = setInterval(() => {}, 1000 * 60 * 60);
+
+process.on("SIGINT", () => {
+  console.log("Shutting down MaVie backend...");
+  server.close(() => {
+    process.exit(0);
+  });
 });
