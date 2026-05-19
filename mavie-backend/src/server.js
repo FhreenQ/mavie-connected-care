@@ -10,6 +10,7 @@ const medicationLogRoutes = require("./routes/medicationLog.routes");
 const careLinkRoutes = require("./routes/careLink.routes");
 const emergencyContactRoutes = require("./routes/emergencyContact.routes");
 const emergencyAlertRoutes = require("./routes/emergencyAlert.routes");
+const healthProfileRoutes = require("./routes/healthProfile.routes");
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use("/medication-logs", medicationLogRoutes);
 app.use("/care-links", careLinkRoutes);
 app.use("/emergency-contacts", emergencyContactRoutes);
 app.use("/emergency-alerts", emergencyAlertRoutes);
+app.use("/health-profile", healthProfileRoutes);
 
 app.listen(PORT, () => {
   console.log(`MaVie backend server running on port ${PORT}`);
