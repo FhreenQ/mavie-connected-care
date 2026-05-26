@@ -25,3 +25,5 @@ dist-ssr/
 
 .expo/
 .expo-shared/
+
+mavie-nurse-mobile/.env

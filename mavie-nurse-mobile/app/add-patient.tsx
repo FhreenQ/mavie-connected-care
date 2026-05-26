@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { usePatients } from "../context/PatientContext";
@@ -14,27 +15,41 @@ import { usePatients } from "../context/PatientContext";
 export default function AddPatientScreen() {
   const { addPatient } = usePatients();
 
-  const [name, setName] = useState("");
-  const [age, setAge] = useState("");
-  const [gender, setGender] = useState("");
-  const [condition, setCondition] = useState("");
-  const [room, setRoom] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSave = () => {
-    if (!name || !age || !condition) {
-      Alert.alert("Missing Information", "Please fill in name, age, and condition.");
+  const handleSave = async () => {
+    if (!patientEmail.trim()) {
+      Alert.alert(
+        "Missing Information",
+        "Please enter the registered patient's email address."
+      );
       return;
     }
 
-    addPatient({
-      name,
-      age,
-      gender: gender || "Not specified",
-      condition,
-      room: room || "Not assigned",
-    });
+    try {
+      setLoading(true);
 
-    router.replace("/nurse-dashboard");
+      await addPatient({
+        patientEmail: patientEmail.trim(),
+      });
+
+      Alert.alert(
+        "Patient Connected",
+        "The patient has been connected to your nurse account."
+      );
+
+      router.replace("/nurse-dashboard");
+    } catch (error) {
+      Alert.alert(
+        "Unable to Connect Patient",
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -44,51 +59,32 @@ export default function AddPatientScreen() {
           <Text style={styles.backText}>← Back to Dashboard</Text>
         </TouchableOpacity>
 
-        <Text style={styles.pageTitle}>Add New Patient</Text>
+        <Text style={styles.pageTitle}>Connect Patient</Text>
+
+        <Text style={styles.description}>
+          Enter the email address of a patient who already registered in the
+          Ma Vie patient app.
+        </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Patient name"
-          placeholderTextColor="#888"
-          value={name}
-          onChangeText={setName}
+          value={patientEmail}
+          onChangeText={setPatientEmail}
+          placeholder="Patient email address"
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Age"
-          placeholderTextColor="#888"
-          value={age}
-          onChangeText={setAge}
-          keyboardType="numeric"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Gender"
-          placeholderTextColor="#888"
-          value={gender}
-          onChangeText={setGender}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Condition"
-          placeholderTextColor="#888"
-          value={condition}
-          onChangeText={setCondition}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Room / Ward"
-          placeholderTextColor="#888"
-          value={room}
-          onChangeText={setRoom}
-        />
-
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSave}>
-          <Text style={styles.primaryButtonText}>Save Patient</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleSave}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Connect Patient</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -120,6 +116,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "bold",
     color: "#1F2937",
+    marginBottom: 12,
+  },
+  description: {
+    fontSize: 15,
+    color: "#6B7280",
+    lineHeight: 22,
     marginBottom: 18,
   },
   input: {

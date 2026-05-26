@@ -6,15 +6,41 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import { usePatients } from "../context/PatientContext";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("nurse@mavie.com");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { login } = usePatients();
 
-  const handleLogin = () => {
-    router.replace("/nurse-dashboard");
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert(
+        "Missing Information",
+        "Please enter your email and password."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await login(email.trim(), password);
+
+      router.replace("/nurse-dashboard");
+    } catch (error) {
+      Alert.alert(
+        "Login Failed",
+        error instanceof Error ? error.message : "Unable to login."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,6 +55,8 @@ export default function LoginScreen() {
           placeholderTextColor="#888"
           value={email}
           onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
 
         <TextInput
@@ -40,18 +68,25 @@ export default function LoginScreen() {
           onChangeText={setPassword}
         />
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
-          <Text style={styles.primaryButtonText}>Login</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Login</Text>
+          )}
         </TouchableOpacity>
 
         <Text style={styles.demoText}>
-          Demo login only. Backend authentication will be connected later.
+          Login using your registered nurse or caregiver account.
         </Text>
       </View>
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -14,9 +15,19 @@ import MedicationCard from "../../../components/nurse/MedicationCard";
 
 export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { patients, updateMedicationStatus } = usePatients();
+  const {
+  patients,
+  loadPatientMedicationData,
+  updateMedicationStatus,
+} = usePatients();
 
   const patient = patients.find((item) => item.id === String(id));
+
+  useEffect(() => {
+   if (id) {
+     loadPatientMedicationData(String(id));
+   }
+  }, [id, loadPatientMedicationData]);
 
   if (!patient) {
     return (
@@ -29,13 +40,6 @@ export default function PatientDetailScreen() {
             onPress={() => router.replace("/nurse-dashboard")}
           >
             <Text style={styles.primaryButtonText}>Back to Dashboard</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => router.push(`/patient/${patient.id}/edit-profile` as any)}
-          >
-            <Text style={styles.editButtonText}>Edit Patient Info</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
