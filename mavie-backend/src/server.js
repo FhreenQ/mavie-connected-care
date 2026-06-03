@@ -11,6 +11,7 @@ const careLinkRoutes = require("./routes/careLink.routes");
 const emergencyContactRoutes = require("./routes/emergencyContact.routes");
 const emergencyAlertRoutes = require("./routes/emergencyAlert.routes");
 const healthProfileRoutes = require("./routes/healthProfile.routes");
+const hospitalRoutes = require("./routes/hospital.routes");
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use("/care-links", careLinkRoutes);
 app.use("/emergency-contacts", emergencyContactRoutes);
 app.use("/emergency-alerts", emergencyAlertRoutes);
 app.use("/health-profile", healthProfileRoutes);
+app.use("/hospital", hospitalRoutes);
 
 const PORT = Number(process.env.PORT) || 5000;
 

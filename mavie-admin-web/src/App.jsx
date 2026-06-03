@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+
 import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
 import PatientDetails from "./pages/PatientDetails";
@@ -14,17 +16,21 @@ function App() {
     <div className="admin-layout">
       <Sidebar />
 
-      <main className="main-content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/patients" element={<Patients />} />
-          <Route path="/patients/add" element={<AddPatient />} />
-          <Route path="/patients/:id" element={<PatientDetails />} />
-          <Route path="/medications" element={<Medications />} />
-          <Route path="/schedules" element={<Schedules />} />
-          <Route path="/emergency-alerts" element={<EmergencyAlerts />} />
-        </Routes>
-      </main>
+      <div className="content-area">
+        <Header />
+
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/patients" element={<Patients />} />
+            <Route path="/patients/add" element={<AddPatient />} />
+            <Route path="/patients/:id" element={<PatientDetails />} />
+            <Route path="/medications" element={<Medications />} />
+            <Route path="/schedules" element={<Schedules />} />
+            <Route path="/emergency-alerts" element={<EmergencyAlerts />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }

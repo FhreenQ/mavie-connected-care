@@ -1,102 +1,3 @@
-// import { Image } from 'expo-image';
-// import { Platform, StyleSheet } from 'react-native';
-
-// import { HelloWave } from '@/components/hello-wave';
-// import ParallaxScrollView from '@/components/parallax-scroll-view';
-// import { ThemedText } from '@/components/themed-text';
-// import { ThemedView } from '@/components/themed-view';
-// import { Link } from 'expo-router';
-
-// export default function HomeScreen() {
-//   return (
-//     <ParallaxScrollView
-//       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-//       headerImage={
-//         <Image
-//           source={require('@/assets/images/partial-react-logo.png')}
-//           style={styles.reactLogo}
-//         />
-//       }>
-//       <ThemedView style={styles.titleContainer}>
-//         <ThemedText type="title">Welcome!</ThemedText>
-//         <HelloWave />
-//       </ThemedView>
-//       <ThemedView style={styles.stepContainer}>
-//         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-//         <ThemedText>
-//           Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-//           Press{' '}
-//           <ThemedText type="defaultSemiBold">
-//             {Platform.select({
-//               ios: 'cmd + d',
-//               android: 'cmd + m',
-//               web: 'F12',
-//             })}
-//           </ThemedText>{' '}
-//           to open developer tools.
-//         </ThemedText>
-//       </ThemedView>
-//       <ThemedView style={styles.stepContainer}>
-//         <Link href="/modal">
-//           <Link.Trigger>
-//             <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-//           </Link.Trigger>
-//           <Link.Preview />
-//           <Link.Menu>
-//             <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-//             <Link.MenuAction
-//               title="Share"
-//               icon="square.and.arrow.up"
-//               onPress={() => alert('Share pressed')}
-//             />
-//             <Link.Menu title="More" icon="ellipsis">
-//               <Link.MenuAction
-//                 title="Delete"
-//                 icon="trash"
-//                 destructive
-//                 onPress={() => alert('Delete pressed')}
-//               />
-//             </Link.Menu>
-//           </Link.Menu>
-//         </Link>
-
-//         <ThemedText>
-//           {`Tap the Explore tab to learn more about what's included in this starter app.`}
-//         </ThemedText>
-//       </ThemedView>
-//       <ThemedView style={styles.stepContainer}>
-//         <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-//         <ThemedText>
-//           {`When you're ready, run `}
-//           <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-//           <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-//           <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-//           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-//         </ThemedText>
-//       </ThemedView>
-//     </ParallaxScrollView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   titleContainer: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     gap: 8,
-//   },
-//   stepContainer: {
-//     gap: 8,
-//     marginBottom: 8,
-//   },
-//   reactLogo: {
-//     height: 178,
-//     width: 290,
-//     bottom: 0,
-//     left: 0,
-//     position: 'absolute',
-//   },
-// });
-
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getUserMedications } from '../../components/medicine-scanner/medicineApi';
@@ -114,41 +15,12 @@ import {
   View,
 } from 'react-native';
 
-const initialMedications = [
-  {
-    id: '1',
-    name: 'Metformin',
-    dose: '500 mg',
-    time: '08:00 AM',
-    instruction: 'After breakfast',
-    benefit: 'Helps control blood sugar level',
-    status: 'Pending',
-  },
-  {
-    id: '2',
-    name: 'Amlodipine',
-    dose: '5 mg',
-    time: '09:00 PM',
-    instruction: 'Before sleeping',
-    benefit: 'Helps control blood pressure',
-    status: 'Pending',
-  },
-];
+import { useAuth } from "@/context/AuthContext";
+import { getHealthProfile, getEmergencyContacts, triggerEmergencyAlert } from "@/services/api";
 
-const emergencyContacts = [
-  { id: '1', name: 'Family Member', phone: '+82 10-1234-5678' },
-  { id: '2', name: 'Caregiver', phone: '+82 10-9876-5432' },
-  { id: '3', name: 'Nurse', phone: '+82 10-5555-2222' },
-];
+import { router } from "expo-router";
 
-const patientInfo = {
-  name: 'Asha',
-  age: 23,
-  bloodType: 'O+',
-  allergies: 'Penicillin',
-  condition: 'Long-term medication monitoring',
-  address: 'Seoul, South Korea',
-};
+const initialMedications = [];
 
 function mapBackendScheduleToMedication(schedule: any) {
   const nextDoseDate = schedule.next_dose_time
@@ -180,6 +52,7 @@ export default function App() {
   const [medications, setMedications] = useState(initialMedications);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+
   const [newMed, setNewMed] = useState({
     name: '',
     dose: '',
@@ -187,6 +60,11 @@ export default function App() {
     instruction: '',
     benefit: '',
   });
+
+  const { user, token, logout } = useAuth();
+
+  const [healthProfile, setHealthProfile] = useState<any>(null);
+  const [emergencyContacts, setEmergencyContacts] = useState<any[]>([]);
 
   const loadBackendMedications = async () => {
     try {
@@ -202,17 +80,43 @@ export default function App() {
     }
   };
 
+  const loadUserProfile = async () => {
+    if (!token) return;
+
+    try {
+      const profileData = await getHealthProfile(token);
+      setHealthProfile(profileData.healthProfile);
+    } catch (error: any) {
+      console.log('No health profile yet:', error.message);
+      setHealthProfile(null);
+    }
+
+    try {
+      const contactsData = await getEmergencyContacts(token);
+      setEmergencyContacts(contactsData.contacts || []);
+    } catch (error: any) {
+      console.log('No emergency contacts yet:', error.message);
+      setEmergencyContacts([]);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadBackendMedications();
-    }, [])
+      loadUserProfile();
+    }, [token])
   );
 
   const stats = useMemo(() => {
     const taken = medications.filter((med) => med.status === 'Taken').length;
     const skipped = medications.filter((med) => med.status === 'Skipped').length;
     const pending = medications.filter((med) => med.status === 'Pending').length;
-    const adherence = medications.length > 0 ? Math.round((taken / medications.length) * 100) : 0;
+
+    const adherence =
+      medications.length > 0
+        ? Math.round((taken / medications.length) * 100)
+        : 0;
+
     return { taken, skipped, pending, adherence };
   }, [medications]);
 
@@ -224,7 +128,10 @@ export default function App() {
 
   const addMedication = () => {
     if (!newMed.name || !newMed.dose || !newMed.time) {
-      Alert.alert('Missing information', 'Please enter medicine name, dose, and time.');
+      Alert.alert(
+        'Missing information',
+        'Please enter medicine name, dose, and time.'
+      );
       return;
     }
 
@@ -239,48 +146,116 @@ export default function App() {
     };
 
     setMedications((prev) => [medication, ...prev]);
-    setNewMed({ name: '', dose: '', time: '', instruction: '', benefit: '' });
+
+    setNewMed({
+      name: '',
+      dose: '',
+      time: '',
+      instruction: '',
+      benefit: '',
+    });
+
     setShowAddModal(false);
   };
 
-  const triggerEmergency = () => {
-    setShowEmergencyModal(false);
-    Alert.alert(
-      'Emergency Alert Sent',
-      'Emergency support and all registered contacts have been notified. This is a prototype alert.'
-    );
+  const patientInfo = {
+    name: user?.username || 'New MaVie User',
+    email: user?.email || 'No email',
+    role: user?.role || 'patient',
+    bloodType: healthProfile?.blood_type || 'Not added yet',
+    allergies: healthProfile?.allergies || 'Not added yet',
+    condition: healthProfile?.conditions || 'Not added yet',
+    address: healthProfile?.home_address || 'Not added yet',
+    emergencyNotes: healthProfile?.emergency_notes || 'Not added yet',
+    dateOfBirth: healthProfile?.date_of_birth || 'Not added yet',
+  };
+
+  const triggerEmergency = async () => {
+    if (!token) {
+      Alert.alert('Login required', 'Please log in again.');
+      return;
+    }
+
+    try {
+      setShowEmergencyModal(false);
+
+      const locationText =
+        patientInfo.address !== 'Not added yet'
+          ? patientInfo.address
+          : 'Location not provided';
+
+      const details = `${patientInfo.name} pressed the emergency button from MaVie mobile app.`;
+
+      const emergencyData = await triggerEmergencyAlert(token, {
+        locationText,
+        details,
+        latitude: null,
+        longitude: null,
+      });
+
+      Alert.alert(
+        'Emergency Sent',
+        `Emergency request #${emergencyData.emergencyEvent.emergency_event_id} was sent to the hospital dashboard.`
+      );
+    } catch (error: any) {
+      console.log('Emergency trigger error:', error);
+
+      Alert.alert(
+        'Emergency failed',
+        error.message || 'Could not send emergency request.'
+      );
+    }
   };
 
   const renderContent = () => {
     if (activeTab === 'Home') {
-      return <HomeScreen stats={stats} medications={medications} setActiveTab={setActiveTab} />;
+      return (
+        <HomeScreen
+          stats={stats}
+          medications={medications}
+          setActiveTab={setActiveTab}
+          patientInfo={patientInfo}
+        />
+      );
     }
 
     if (activeTab === 'Medication') {
       return (
         <MedicationScreen
-  	   medications={medications}
-  	   markMedication={markMedication}
-  	   openAddModal={() => router.push('/add-medicine' as any)}
-  	   openScanner={() => router.push('/add-medicine' as any)}
-	/>
+          medications={medications}
+          markMedication={markMedication}
+          openAddModal={() => router.push('/add-medicine' as any)}
+          openScanner={() => router.push('/add-medicine' as any)}
+        />
       );
     }
 
     if (activeTab === 'Caregiver') {
-      return <CaregiverScreen medications={medications} stats={stats} />;
+      return (
+        <CaregiverScreen
+          medications={medications}
+          stats={stats}
+          patientInfo={patientInfo}
+        />
+      );
     }
 
     if (activeTab === 'Emergency') {
-      return <EmergencyScreen openEmergency={() => setShowEmergencyModal(true)} />;
+      return (
+        <EmergencyScreen
+          openEmergency={() => setShowEmergencyModal(true)}
+          emergencyContacts={emergencyContacts}
+        />
+      );
     }
 
-    return <ProfileScreen />;
+    return <ProfileScreen patientInfo={patientInfo} logout={logout} />;
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
+
       <View style={styles.appContainer}>
         {renderContent()}
         <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -303,7 +278,7 @@ export default function App() {
   );
 }
 
-function HomeScreen({ stats, medications, setActiveTab }) {
+function HomeScreen({ stats, medications, setActiveTab, patientInfo }) {
   const nextMedication = medications.find((med) => med.status === 'Pending');
 
   return (
@@ -408,7 +383,7 @@ function MedicationScreen({ medications, markMedication, openAddModal, openScann
   );
 }
 
-function CaregiverScreen({ medications, stats }) {
+function CaregiverScreen({ medications, stats, patientInfo }) {
   const missedMeds = medications.filter((med) => med.status === 'Skipped');
 
   return (
@@ -447,65 +422,105 @@ function CaregiverScreen({ medications, stats }) {
   );
 }
 
-function EmergencyScreen({ openEmergency }) {
+function EmergencyScreen({ openEmergency, emergencyContacts }) {
   return (
-    <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
-      <Text style={styles.pageTitle}>Emergency Support</Text>
-      <Text style={styles.pageSubtitle}>Fast alert for ambulance and registered contacts</Text>
-
+    <ScrollView style={styles.screen}>
       <View style={styles.emergencyCard}>
-        <Text style={styles.emergencyEmoji}>🚨</Text>
-        <Text style={styles.emergencyTitle}>Need urgent help?</Text>
+        <Text style={styles.emergencyIcon}>🚨</Text>
+        <Text style={styles.emergencyTitle}>Emergency Support</Text>
         <Text style={styles.emergencyText}>
-          Press the button below to send an emergency alert to all registered contacts.
+          Press the button below to alert your emergency contacts.
         </Text>
-        <TouchableOpacity style={styles.bigEmergencyButton} onPress={openEmergency}>
-          <Text style={styles.bigEmergencyText}>Send Emergency Alert</Text>
+
+        <TouchableOpacity
+          style={styles.sendEmergencyButton}
+          onPress={openEmergency}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.sendEmergencyButtonIcon}>🚨</Text>
+          <Text style={styles.sendEmergencyButtonText}>Send Emergency Alert</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Emergency contacts</Text>
-        {emergencyContacts.map((contact) => (
-          <View key={contact.id} style={styles.contactRow}>
-            <View>
-              <Text style={styles.contactName}>{contact.name}</Text>
-              <Text style={styles.contactPhone}>{contact.phone}</Text>
-            </View>
-            <Text style={styles.contactIcon}>📞</Text>
-          </View>
-        ))}
+        <Text style={styles.sectionTitle}>Emergency Contacts</Text>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push("/emergency-contacts" as any)}
+        >
+          <Text style={styles.primaryButtonText}>
+            Add / Manage Emergency Contacts
+          </Text>
+        </TouchableOpacity>
+
+        {emergencyContacts.length === 0 ? (
+          <Text style={{ marginTop: 14, color: "#6B7280", fontWeight: "700" }}>
+            No emergency contacts added yet.
+          </Text>
+        ) : (
+          emergencyContacts.map((contact: any) => {
+            const id = contact.contact_id || contact.contactId || contact.id;
+            const name =
+              contact.contact_name ||
+              contact.contactName ||
+              contact.name ||
+              "Unnamed contact";
+            const phone =
+              contact.phone_number ||
+              contact.phoneNumber ||
+              contact.phone ||
+              "No phone";
+
+            return (
+              <View key={String(id)} style={styles.contactRow}>
+                <View>
+                  <Text style={styles.contactName}>{name}</Text>
+                  <Text style={styles.contactPhone}>{phone}</Text>
+                </View>
+              </View>
+            );
+          })
+        )}
       </View>
     </ScrollView>
   );
 }
 
-function ProfileScreen() {
+function ProfileScreen({ patientInfo, logout }) {
   return (
-    <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
-      <Text style={styles.pageTitle}>Health Profile</Text>
-      <Text style={styles.pageSubtitle}>Important information for caregivers and emergency support</Text>
-
+    <ScrollView style={styles.screen}>
       <View style={styles.profileCard}>
         <Text style={styles.avatar}>👤</Text>
         <Text style={styles.profileName}>{patientInfo.name}</Text>
-        <Text style={styles.profileSubtext}>{patientInfo.condition}</Text>
+        <Text style={styles.profileSubtext}>{patientInfo.email}</Text>
+        <Text style={styles.profileSubtext}>Role: {patientInfo.role}</Text>
       </View>
 
       <View style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Medical information</Text>
-        <InfoRow label="Age" value={patientInfo.age} />
+
+        <InfoRow label="Date of birth" value={patientInfo.dateOfBirth} />
         <InfoRow label="Blood type" value={patientInfo.bloodType} />
         <InfoRow label="Allergies" value={patientInfo.allergies} />
+        <InfoRow label="Condition" value={patientInfo.condition} />
         <InfoRow label="Address" value={patientInfo.address} />
+        <InfoRow label="Emergency notes" value={patientInfo.emergencyNotes} />
       </View>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>App purpose</Text>
-        <Text style={styles.description}>
-          MaVie helps users manage medication schedules, allows caregivers to monitor intake, and supports faster emergency communication.
-        </Text>
-      </View>
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => router.push("/edit-health-profile" as any)}
+      >
+        <Text style={styles.primaryButtonText}>Add / Edit My Information</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.dangerButton, { marginTop: 12 }]}
+        onPress={logout}
+      >
+        <Text style={styles.dangerButtonText}>Log Out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -1125,4 +1140,30 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
+
+  sendEmergencyButton: {
+  marginTop: 20,
+  backgroundColor: "#DC2626",
+  borderRadius: 24,
+  paddingVertical: 22,
+  paddingHorizontal: 20,
+  alignItems: "center",
+  justifyContent: "center",
+  shadowColor: "#DC2626",
+  shadowOpacity: 0.35,
+  shadowRadius: 12,
+  elevation: 6,
+},
+
+sendEmergencyButtonIcon: {
+  fontSize: 34,
+  marginBottom: 8,
+},
+
+sendEmergencyButtonText: {
+  color: "#FFFFFF",
+  fontSize: 20,
+  fontWeight: "900",
+  textAlign: "center",
+},
 });
