@@ -1,0 +1,245 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #eef4f3;
+  color: #102129;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.header {
+  background: linear-gradient(135deg, #0d7c7a, #84c7ba);
+  color: white;
+  padding: 28px;
+  border-radius: 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  box-shadow: 0 20px 50px rgba(13, 124, 122, 0.22);
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.header p {
+  margin: 8px 0 0;
+  font-size: 16px;
+  opacity: 0.92;
+}
+
+.refresh-btn {
+  border: none;
+  background: white;
+  color: #0d7c7a;
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.error-box {
+  margin-top: 20px;
+  background: #ffe8e8;
+  color: #9c1c1c;
+  border: 1px solid #ffb7b7;
+  padding: 14px 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.events-panel,
+.history-panel {
+  background: white;
+  border-radius: 28px;
+  padding: 22px;
+  min-height: 680px;
+  box-shadow: 0 16px 45px rgba(16, 33, 41, 0.08);
+}
+
+.events-panel h2,
+.history-panel h2 {
+  margin-top: 0;
+}
+
+.event-card,
+.empty-card,
+.patient-summary,
+.med-card {
+  border: 1px solid #e1ebea;
+  background: #fbfefe;
+  border-radius: 22px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.empty-card {
+  color: #65787d;
+}
+
+.empty-card p {
+  font-weight: 800;
+  color: #102129;
+  margin: 0 0 4px;
+}
+
+.event-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.event-top h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.event-top p {
+  margin: 4px 0 0;
+  color: #65787d;
+}
+
+.status {
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+  background: #fff2cc;
+  color: #8a5a00;
+}
+
+.status.accepted {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status.triggered {
+  background: #fff2cc;
+  color: #8a5a00;
+}
+
+.event-info {
+  margin-top: 16px;
+}
+
+.event-info p {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+  color: #31464c;
+}
+
+.time {
+  font-size: 13px;
+  color: #71878c;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.actions button {
+  border: none;
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.accept {
+  background: #0f9f6e;
+  color: white;
+}
+
+.reject {
+  background: #e54848;
+  color: white;
+}
+
+.history {
+  background: #e8f3f2;
+  color: #0d7c7a;
+}
+
+.patient-summary h3 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.patient-summary p {
+  margin: 8px 0;
+  color: #31464c;
+}
+
+.history-list {
+  margin-top: 18px;
+}
+
+.med-card h4 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.med-card p {
+  margin: 4px 0 0;
+  color: #65787d;
+}
+
+.med-details {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: #31464c;
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
