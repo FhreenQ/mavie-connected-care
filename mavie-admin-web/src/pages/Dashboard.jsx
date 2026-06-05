@@ -1,38 +1,99 @@
-import { Routes, Route } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { getAdminDashboard } from "../services/api";
 
-import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
+function Dashboard() {
+  const [stats, setStats] = useState(null);
+  const [error, setError] = useState("");
 
-import Dashboard from "./pages/Dashboard";
-import Patients from "./pages/Patients";
-import PatientDetails from "./pages/PatientDetails";
-import AddPatient from "./pages/AddPatient";
-import Medications from "./pages/Medications";
-import Schedules from "./pages/Schedules";
-import EmergencyAlerts from "./pages/EmergencyAlerts";
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        const data = await getAdminDashboard();
+        setStats(data);
+      } catch (err) {
+        setError(err.message || "Failed to load dashboard");
+      }
+    }
 
-function App() {
+    loadDashboard();
+  }, []);
+
+  if (error) {
+    return (
+      <div>
+        <h1>Dashboard</h1>
+        <p style={styles.error}>Error: {error}</p>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div>
+        <h1>Dashboard</h1>
+        <p>Loading dashboard data...</p>
+      </div>
+    );
+  }
+
+  const cards = [
+    { label: "Total Users", value: stats.users },
+    { label: "Patients", value: stats.patients },
+    { label: "Caregivers / Nurses", value: stats.caregivers },
+    { label: "Medications", value: stats.medications },
+    { label: "Active Schedules", value: stats.activeSchedules },
+    { label: "Emergency Events", value: stats.emergencyEvents },
+    { label: "Missed Medication Logs", value: stats.missedLogs },
+  ];
+
   return (
-    <div className="admin-layout">
-      <Sidebar />
+    <div>
+      <h1 style={styles.title}>Dashboard</h1>
+      <p style={styles.subtitle}>System overview from the MaVie backend database.</p>
 
-      <div className="content-area">
-        <Header />
-
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/patients/add" element={<AddPatient />} />
-            <Route path="/patients/:id" element={<PatientDetails />} />
-            <Route path="/medications" element={<Medications />} />
-            <Route path="/schedules" element={<Schedules />} />
-            <Route path="/emergency-alerts" element={<EmergencyAlerts />} />
-          </Routes>
-        </main>
+      <div style={styles.grid}>
+        {cards.map((card) => (
+          <div key={card.label} style={styles.card}>
+            <p style={styles.label}>{card.label}</p>
+            <h2 style={styles.value}>{card.value ?? 0}</h2>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-export default App;
+const styles = {
+  title: {
+    margin: "0 0 8px",
+  },
+  subtitle: {
+    margin: "0 0 24px",
+    color: "#64748b",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "18px",
+  },
+  card: {
+    background: "white",
+    padding: "22px",
+    borderRadius: "16px",
+    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+  },
+  label: {
+    margin: "0 0 10px",
+    color: "#64748b",
+    fontWeight: "600",
+  },
+  value: {
+    margin: 0,
+    fontSize: "34px",
+  },
+  error: {
+    color: "#dc2626",
+  },
+};
+
+export default Dashboard;
