@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 import "./App.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const DEV_EMAIL = import.meta.env.VITE_DEV_EMAIL;
-const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const DEV_EMAIL = import.meta.env.VITE_DEV_EMAIL || "hospital@mavie.com";
+const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD || "hospital123";
 
 export default function App() {
   const [token, setToken] = useState("");
@@ -21,9 +21,10 @@ export default function App() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState("");
-
-  async function apiRequest(path, options = {}) {
+  
+async function apiRequest(path, options = {}) {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
@@ -44,11 +45,6 @@ export default function App() {
 
   async function loginHospital() {
     setError("");
-
-    if (!API_BASE_URL || !DEV_EMAIL || !DEV_PASSWORD) {
-      setError("Missing VITE_API_BASE_URL, VITE_DEV_EMAIL, or VITE_DEV_PASSWORD.");
-      return;
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -102,17 +98,34 @@ export default function App() {
   }
 
   async function loadMedicationHistory(patientId, event) {
-    setError("");
+  setError("");
+  setHistoryLoading(true);
 
-    try {
-      const data = await apiRequest(`/hospital/patients/${patientId}/medication-history`);
-      setSelectedHistory(data);
-      setSelectedEvent(event);
-    } catch (err) {
-      setError(err.message);
-    }
+  const finalPatientId = patientId || event?.patient_user_id || event?.user_id;
+
+  if (!finalPatientId) {
+    setError("Cannot load medication history because patient ID is missing.");
+    setHistoryLoading(false);
+    return;
   }
 
+  try {
+    const data = await apiRequest(
+      `/hospital/patients/${finalPatientId}/medication-history`
+    );
+
+    setSelectedHistory({
+      patient: data.patient || {},
+      history: Array.isArray(data.history) ? data.history : [],
+    });
+
+    setSelectedEvent(event || null);
+  } catch (err) {
+    setError(err.message || "Failed to load patient medication history");
+  } finally {
+    setHistoryLoading(false);
+  }
+}
   async function respondToEvent(event, responseStatus) {
     setActionLoading(true);
     setError("");
@@ -126,7 +139,7 @@ export default function App() {
       await loadEvents();
 
       if (responseStatus === "Accepted") {
-        await loadMedicationHistory(event.patient_user_id, event);
+        await loadMedicationHistory(event.patient_user_id || event.user_id, event);
       }
 
       if (responseStatus === "Rejected") {
@@ -161,8 +174,8 @@ export default function App() {
   );
 
   return (
-    <main className="app">
-      <section className="header">
+    <div className="app">
+      <header className="header">
         <div>
           <div className="title-row">
             <Hospital size={34} />
@@ -178,7 +191,7 @@ export default function App() {
           <RefreshCw size={18} />
           {loading ? "Refreshing..." : "Refresh"}
         </button>
-      </section>
+      </header>
 
       {error && (
         <div className="error-box">
@@ -187,8 +200,8 @@ export default function App() {
         </div>
       )}
 
-      <section className="layout">
-        <div className="events-panel">
+      <main className="layout">
+        <section className="events-panel">
           <h2>Incoming Emergency Requests</h2>
 
           {activeEvents.length === 0 ? (
@@ -198,15 +211,15 @@ export default function App() {
             </div>
           ) : (
             activeEvents.map((event) => (
-              <article key={event.emergency_event_id} className="event-card">
+              <div className="event-card" key={event.emergency_event_id}>
                 <div className="event-top">
                   <div>
-                    <h3>{event.patient_name}</h3>
-                    <p>{event.patient_email}</p>
+                    <h3>{event.patient_name || "Unknown Patient"}</h3>
+                    <p>{event.patient_email || "-"}</p>
                   </div>
 
-                  <span className={`status ${event.status.toLowerCase()}`}>
-                    {event.status}
+                  <span className={`status ${String(event.status || "").toLowerCase()}`}>
+                    {event.status || "Triggered"}
                   </span>
                 </div>
 
@@ -219,59 +232,70 @@ export default function App() {
                     <AlertTriangle size={16} />
                     {event.details || "No emergency details provided"}
                   </p>
+                  <span className="time">
+                    Created:{" "}
+                    {event.created_at
+                      ? new Date(event.created_at).toLocaleString()
+                      : "-"}
+                  </span>
                 </div>
-
-                <p className="time">
-                  Created: {new Date(event.created_at).toLocaleString()}
-                </p>
 
                 <div className="actions">
                   <button
                     className="accept"
-                    disabled={actionLoading}
                     onClick={() => respondToEvent(event, "Accepted")}
+                    disabled={actionLoading}
                   >
-                    <CheckCircle size={18} />
+                    <CheckCircle size={17} />
                     Accept
                   </button>
 
                   <button
                     className="reject"
-                    disabled={actionLoading}
                     onClick={() => respondToEvent(event, "Rejected")}
+                    disabled={actionLoading}
                   >
-                    <XCircle size={18} />
+                    <XCircle size={17} />
                     Reject
                   </button>
 
                   <button
                     className="history"
-                    onClick={() =>
-                      loadMedicationHistory(event.patient_user_id, event)
-                    }
+                    onClick={() => loadMedicationHistory(event.patient_user_id, event)}
+                    disabled={actionLoading || historyLoading}
                   >
-                    <Pill size={18} />
-                    View History
+                    <Pill size={17} />
+                    {historyLoading ? "Loading..." : "View History"}
                   </button>
                 </div>
-              </article>
+              </div>
             ))
           )}
-        </div>
+        </section>
 
-        <div className="history-panel">
+        <section className="history-panel">
           <h2>Patient Medication History</h2>
 
-          {!selectedHistory ? (
+          {historyLoading ? (
             <div className="empty-card">
+              <p>Loading patient medication history.</p>
+            </div>
+          ) : !selectedHistory ? (
+	    <div className="empty-card">
               <p>No patient selected.</p>
-              <span>Accept an emergency request to view medication history.</span>
+	      <span>Accept an emergency request or click View History </span>
             </div>
           ) : (
+
+
             <>
               <div className="patient-summary">
-                <h3>{selectedHistory.patient.username}</h3>
-                <p>{selectedHistory.patient.email}</p>
+                <h3>{selectedHistory.patient?.username || "Unknown Patient"}</h3>
+		<p>{selectedHistory.patient?.email || "-"}</p>
+                <p>
+                  <strong>Event:</strong>{" "}
+                  {selectedEvent?.location_text || "No location text"}
+                </p>
                 <p>
                   <strong>Blood Type:</strong>{" "}
                   {selectedHistory.patient.blood_type || "Not provided"}
@@ -291,36 +315,47 @@ export default function App() {
               </div>
 
               <div className="history-list">
-                {selectedHistory.history.length === 0 ? (
+                {(selectedHistory.history || []).length === 0 ? (
                   <div className="empty-card">
                     <p>No medication history found.</p>
                   </div>
                 ) : (
-                  selectedHistory.history.map((item, index) => (
+                 (selectedHistory.history || []).map((item, index) => (
                     <div className="med-card" key={`${item.schedule_id}-${item.log_id || index}`}>
-                      <div>
-                        <h4>{item.brand_name || item.generic_name}</h4>
-                        <p>
-                          {item.generic_name} · {item.strength || "No strength"}
-                        </p>
-                      </div>
+                      <h4>{item.brand_name || item.generic_name || "Medication"}</h4>
+                      <p>
+                        {item.generic_name || "-"} · {item.strength || "No strength"}
+                      </p>
 
                       <div className="med-details">
-                        <span>Dosage: {item.dosage}</span>
-                        <span>Instruction: {item.instructions || "-"}</span>
-                        <span>Status: {item.log_status || "Scheduled"}</span>
                         <span>
-                          Scheduled:{" "}
+                          <strong>Dosage:</strong> {item.dosage || "-"}
+                        </span>
+                        <span>
+                          <strong>Instruction:</strong> {item.instructions || "-"}
+                        </span>
+                        <span>
+                          <strong>Status:</strong> {item.log_status || "Scheduled"}
+                        </span>
+                        <span>
+                          <strong>Scheduled:</strong>{" "}
                           {item.scheduled_time
                             ? new Date(item.scheduled_time).toLocaleString()
-                            : new Date(item.next_dose_time).toLocaleString()}
+                            : item.next_dose_time
+                              ? new Date(item.next_dose_time).toLocaleString()
+                              : "-"}
                         </span>
                         {item.taken_at && (
                           <span>
-                            Taken: {new Date(item.taken_at).toLocaleString()}
+                            <strong>Taken:</strong>{" "}
+                            {new Date(item.taken_at).toLocaleString()}
                           </span>
                         )}
-                        {item.note && <span>Note: {item.note}</span>}
+                        {item.note && (
+                          <span>
+                            <strong>Note:</strong> {item.note}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))
@@ -328,8 +363,8 @@ export default function App() {
               </div>
             </>
           )}
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   );
 }

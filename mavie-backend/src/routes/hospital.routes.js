@@ -115,26 +115,20 @@ router.post(
         [eventId, req.user.userId, responseStatus]
       );
 
-      await pool.query(
-        `
-        UPDATE emergency_events
-        SET status = $1,
-            accepted_by_user_id = CASE
-              WHEN $1 = 'Accepted' THEN $2
-              ELSE accepted_by_user_id
-            END,
-            accepted_at = CASE
-              WHEN $1 = 'Accepted' THEN CURRENT_TIMESTAMP
-              ELSE accepted_at
-            END,
-            resolved_at = CASE
-              WHEN $1 = 'Rejected' THEN CURRENT_TIMESTAMP
-              ELSE resolved_at
-            END
-        WHERE emergency_event_id = $3
-        `,
-        [responseStatus, req.user.userId, eventId]
-      );
+      const eventStatus = responseStatus === "Accepted" ? "Acknowledged" : "Cancelled";
+
+await pool.query(
+  `
+  UPDATE emergency_events
+  SET
+    status = $1,
+    accepted_by_user_id = CASE WHEN $2 = 'Accepted' THEN $3 ELSE accepted_by_user_id END,
+    accepted_at = CASE WHEN $2 = 'Accepted' THEN CURRENT_TIMESTAMP ELSE accepted_at END,
+    resolved_at = CASE WHEN $2 = 'Rejected' THEN CURRENT_TIMESTAMP ELSE resolved_at END
+  WHERE emergency_event_id = $4
+  `,
+  [eventStatus, responseStatus, req.user.userId, eventId]
+);
 
       res.json({
         message: `Emergency event ${responseStatus.toLowerCase()} successfully`,
@@ -149,78 +143,75 @@ router.post(
   }
 );
 
-// Get patient medication history for hospital
-router.get(
-  "/patients/:patientId/medication-history",
-  authMiddleware,
-  requireHospitalUser,
-  async (req, res) => {
-    try {
-      const { patientId } = req.params;
+// Hospital: view patient medication history
+router.get("/patients/:patientId/medication-history", authMiddleware, requireHospitalUser, async (req, res) => {
+  try {
+    const { patientId } = req.params;
 
-      const patientResult = await pool.query(
-        `
-        SELECT
-          u.user_id,
-          u.username,
-          u.email,
-          hp.date_of_birth,
-          hp.blood_type,
-          hp.allergies,
-          hp.conditions,
-          hp.emergency_notes,
-          hp.home_address
-        FROM users u
-        LEFT JOIN health_profiles hp ON hp.user_id = u.user_id
-        WHERE u.user_id = $1
-        `,
-        [patientId]
-      );
+    const patientResult = await pool.query(
+      `
+      SELECT
+        u.user_id,
+        u.username,
+        u.email,
+        hp.date_of_birth,
+        hp.blood_type,
+        hp.allergies,
+        hp.conditions,
+        hp.emergency_notes,
+        hp.home_address
+      FROM users u
+      LEFT JOIN health_profiles hp ON hp.user_id = u.user_id
+      WHERE u.user_id = $1
+      `,
+      [patientId]
+    );
 
-      if (patientResult.rows.length === 0) {
-        return res.status(404).json({ message: "Patient not found" });
-      }
-
-      const historyResult = await pool.query(
-        `
-        SELECT
-          s.schedule_id,
-          m.rxnorm_id,
-          m.generic_name,
-          m.brand_name,
-          m.form,
-          m.strength,
-          s.dosage,
-          s.instructions,
-          s.frequency_hours,
-          s.next_dose_time,
-          ml.log_id,
-          ml.scheduled_time,
-          ml.taken_at,
-          ml.status AS log_status,
-          ml.note
-        FROM schedules s
-        JOIN medications m ON m.rxnorm_id = s.rxnorm_id
-        LEFT JOIN medication_logs ml ON ml.schedule_id = s.schedule_id
-        WHERE s.user_id = $1
-        ORDER BY COALESCE(ml.scheduled_time, s.next_dose_time) DESC
-        LIMIT 50
-        `,
-        [patientId]
-      );
-
-      res.json({
-        patient: patientResult.rows[0],
-        history: historyResult.rows,
-      });
-    } catch (error) {
-      console.error("Get hospital patient history error:", error);
-      res.status(500).json({
-        message: "Failed to load patient medication history",
-        error: error.message,
-      });
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json({ message: "Patient not found" });
     }
-  }
-);
 
-module.exports = router;
+    const historyResult = await pool.query(
+      `
+      SELECT
+        s.schedule_id,
+        s.rxnorm_id,
+        s.dosage,
+        s.instructions,
+        s.frequency_hours,
+        s.next_dose_time,
+        s.active,
+
+        m.generic_name,
+        m.brand_name,
+        m.form,
+        m.strength,
+
+        ml.log_id,
+        ml.scheduled_time,
+        ml.taken_at,
+        ml.status AS log_status,
+        ml.note
+      FROM schedules s
+      LEFT JOIN medications m ON m.rxnorm_id = s.rxnorm_id
+      LEFT JOIN medication_logs ml ON ml.schedule_id = s.schedule_id
+      WHERE s.user_id = $1
+      ORDER BY
+        COALESCE(ml.scheduled_time, s.next_dose_time) DESC
+      LIMIT 50
+      `,
+      [patientId]
+    );
+
+    res.json({
+      patient: patientResult.rows[0],
+      history: historyResult.rows,
+    });
+  } catch (error) {
+    console.error("Get hospital patient history error:", error);
+    res.status(500).json({
+      message: "Failed to load patient medication history",
+      error: error.message,
+    });
+  }
+});module.exports = router;

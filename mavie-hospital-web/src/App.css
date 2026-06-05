@@ -243,3 +243,28 @@ body {
     align-items: flex-start;
   }
 }
+
+.status.acknowledged {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status.triggered {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status.active {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status.resolved {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
