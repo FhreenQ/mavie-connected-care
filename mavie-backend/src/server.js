@@ -13,6 +13,8 @@ const emergencyAlertRoutes = require("./routes/emergencyAlert.routes");
 const healthProfileRoutes = require("./routes/healthProfile.routes");
 const hospitalRoutes = require("./routes/hospital.routes");
 const adminRoutes = require("./routes/admin.routes");
+const drugInteractionRoutes = require("./routes/drugInteractionRoutes");
+const prescriptionScanRoutes = require("./routes/prescriptionScanRoutes");
 
 const app = express();
 
@@ -23,6 +25,10 @@ app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
   next();
 });
+
+app.use("/drug-interactions", drugInteractionRoutes);
+
+app.use("/prescriptions", prescriptionScanRoutes);
 
 app.get("/", (req, res) => {
   res.json({

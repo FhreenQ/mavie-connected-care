@@ -166,6 +166,90 @@ export async function getUserMedications() {
   return response.schedules || [];
 }
 
-export async function scanMedicineImageWithBackend() {
-  throw new Error("AI medicine scanning will be connected later.");
+function getGenericAlias(name) {
+  const normalized = String(name || "")
+    .toLowerCase()
+    .replace(/[™®]/g, "")
+    .trim();
+
+  const aliases = {
+    glucophage: "Metformin",
+    glucohage: "Metformin",
+    norvasc: "Amlodipine",
+    tenormin: "Atenolol",
+    lipitor: "Atorvastatin",
+    plavix: "Clopidogrel",
+  };
+
+  return aliases[normalized] || null;
+}
+
+export async function scanMedicineImageWithBackend(imageAsset) {
+  if (!hasBackend()) {
+    throw new Error("No backend URL configured. Please set EXPO_PUBLIC_API_BASE_URL.");
+  }
+
+  if (!imageAsset?.uri) {
+    throw new Error("No image selected.");
+  }
+
+  const formData = new FormData();
+
+  const fileName = imageAsset.fileName || "prescription.jpg";
+  const fileType = imageAsset.mimeType || imageAsset.type || "image/jpeg";
+
+  formData.append("prescriptionImage", {
+    uri: imageAsset.uri,
+    name: fileName,
+    type: fileType,
+  });
+
+  const token = await loginForDevToken();
+
+  const schedulesResponse = await apiRequest("/schedules", {
+    method: "GET",
+  });
+
+  const existingMedications = (schedulesResponse.schedules || []).map((schedule) => {
+    const savedName =
+      schedule.genericName ||
+      schedule.brandName ||
+      schedule.medicationName ||
+      schedule.name ||
+      schedule.rxnormId;
+
+    return {
+      name: savedName,
+      rawName: savedName,
+      brandName: schedule.brandName || schedule.medicationName || schedule.name || savedName,
+      genericName: schedule.genericName || getGenericAlias(savedName),
+      ingredientCandidates: [
+        schedule.genericName,
+        getGenericAlias(savedName),
+        savedName,
+      ].filter(Boolean),
+      strength: schedule.dosage || schedule.strength || null,
+      source: "EXISTING_SCHEDULE",
+    };
+  });
+
+  formData.append("existingMedications", JSON.stringify(existingMedications));
+
+  console.log("Uploading prescription image to:", `${API_BASE_URL}/prescriptions/scan-and-check`);
+
+  const response = await fetch(`${API_BASE_URL}/prescriptions/scan-and-check`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(text || "Failed to scan prescription image.");
+  }
+
+  return JSON.parse(text);
 }

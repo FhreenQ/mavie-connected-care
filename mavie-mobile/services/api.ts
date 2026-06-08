@@ -175,3 +175,28 @@ export function triggerEmergencyAlert(
     body: payload,
   });
 }
+
+export async function scanPrescriptionImage(imageUri: string) {
+  const formData = new FormData();
+
+  formData.append("prescriptionImage", {
+    uri: imageUri,
+    name: "prescription.jpg",
+    type: "image/jpeg",
+  } as any);
+
+  const response = await fetch(`${API_BASE_URL}/prescriptions/scan-and-check`, {
+    method: "POST",
+    body: formData,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to scan prescription");
+  }
+
+  return response.json();
+}

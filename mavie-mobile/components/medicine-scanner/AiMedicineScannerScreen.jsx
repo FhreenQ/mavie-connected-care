@@ -11,8 +11,7 @@ import {
   View
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { saveUserMedication } from "./medicineApi";
-import { scanMedicineImage } from "./medicineScannerDemo";
+import { saveUserMedication, scanMedicineImageWithBackend } from "./medicineApi";
 
 const frequencyOptions = ["once daily", "twice daily", "three times daily", "once weekly", "as written on prescription"];
 const mealTimingOptions = ["before meal", "after meal", "with meal", "with food", "no specific timing", "as written on prescription"];
@@ -76,12 +75,15 @@ export default function AiMedicineScannerScreen({ navigation }) {
     setSuccess("");
 
     try {
-      const result = await scanMedicineImage(imageAsset);
+      const result = await scanMedicineImageWithBackend(imageAsset);
+      console.log("Backend scan result:", result);
+
       setScanResult(result);
       setConfirmed(false);
       setForm(createFormFromScan(result));
-    } catch {
-      setError("MaVie could not scan this image. Please try another photo or enter the information manually.");
+    } catch (error) {
+      console.log("Scan error:", error);
+      setError(error.message || "MaVie could not scan this image. Please try another photo or enter the information manually.");
     } finally {
       setIsScanning(false);
     }
@@ -100,7 +102,10 @@ export default function AiMedicineScannerScreen({ navigation }) {
 
     const payload = {
       medicationName: form.medicineName.trim(),
-      genericName: scanResult?.matchedMedicine?.genericName || form.medicineName.trim(),
+      genericName:
+        scanResult?.extractedMedications?.[0]?.genericName ||
+        scanResult?.extractedMedications?.[0]?.name ||
+        form.medicineName.trim(),
       dosageStrength: form.strength.trim(),
       frequency: form.frequency,
       mealTiming: form.mealTiming,
@@ -111,10 +116,14 @@ export default function AiMedicineScannerScreen({ navigation }) {
       source: "AI_SCAN",
       confirmedByUser: true,
       scanSummary: {
-        detectedText: scanResult?.ocrResult?.text || "",
-        confidenceScore: scanResult?.confidence || 0,
-        matchSource: scanResult?.matchSource || "MANUAL_REQUIRED"
-      }
+      detectedText: scanResult?.extractedMedications
+        ?.map((med) => med.name)
+        .join(", ") || "",
+      confidenceScore: scanResult?.extractedMedications?.[0]?.confidence || "unknown",
+      matchSource: "OPENAI_PRESCRIPTION_SCAN",
+      interactionStatus: scanResult?.interactionCheck?.overallStatus || "UNKNOWN",
+      interactionCount: scanResult?.interactionCheck?.interactionCount || 0
+    }
     };
 
   try {
@@ -197,57 +206,123 @@ export default function AiMedicineScannerScreen({ navigation }) {
 
       {canShowResults ? (
         <>
-          <ResultCard title="A. Visual AI Result">
-            <Text style={styles.muted}>Possible match: {topPredictionText}</Text>
-            {scanResult.cnnPredictions.map((item, index) => (
-              <Text key={`${item.medicineId}-${index}`} style={styles.predictionText}>
-                {index + 1}. {item.label} - {Math.round(item.confidence * 100)}%
+          <ResultCard title="A. Extracted Medications">
+            {scanResult.extractedMedications?.map((med, index) => (
+              <Text key={`${med.name}-${index}`} style={styles.infoLine}>
+                {index + 1}. {med.name}
+                {med.strength ? ` - ${med.strength}` : ""}
+                {med.genericName ? ` | Generic: ${med.genericName}` : ""}
               </Text>
             ))}
           </ResultCard>
 
-          <ResultCard title="B. OCR Result">
-            <Text style={styles.muted}>Detected text:</Text>
-            <Text style={styles.ocrText}>{scanResult.ocrResult.text || "No text detected. Please confirm manually."}</Text>
-          </ResultCard>
+          <ResultCard title="B. Interaction Check">
+            <Text style={styles.infoLine}>
+              Status: {scanResult.interactionCheck?.overallStatus}
+            </Text>
+            <Text style={styles.infoLine}>
+              Interaction count: {scanResult.interactionCheck?.interactionCount || 0}
+            </Text>
 
-          <ResultCard title="C. Medicine Information">
-            {scanResult.matchedMedicine ? (
-              <>
-                <Text style={styles.infoLine}>Medicine: {scanResult.matchedMedicine.genericName} {scanResult.matchedMedicine.strength}</Text>
-                <Text style={styles.infoLine}>Purpose: {scanResult.matchedMedicine.purpose}</Text>
-                <Text style={styles.infoLine}>Common meal timing: {scanResult.matchedMedicine.commonMealTiming}</Text>
-                <Text style={styles.infoLine}>Warnings: {scanResult.matchedMedicine.warnings.join(" ")}</Text>
-              </>
+            {scanResult.interactionCheck?.interactions?.length ? (
+              scanResult.interactionCheck.interactions.map((item, index) => (
+                <View key={`${item.matchedDrug1}-${item.matchedDrug2}-${index}`}>
+                  <Text style={styles.warningText}>
+                    {index + 1}. {item.matchedDrug1} + {item.matchedDrug2}
+                  </Text>
+                  <Text style={styles.infoLine}>
+                    {item.interactionDescription}
+                  </Text>
+                </View>
+              ))
             ) : (
               <Text style={styles.warningText}>
-                We could not confidently identify this medicine. Please enter the information manually or ask a pharmacist, caregiver, nurse, or doctor.
+                No known interaction found in this database. This does not guarantee the combination is safe.
               </Text>
             )}
-            {scanResult.warnings.map((warning) => (
-              <Text key={warning} style={styles.warningText}>{warning}</Text>
-            ))}
+          </ResultCard>
+
+          <ResultCard title="C. Safety Note">
+            <Text style={styles.warningText}>
+              {scanResult.safetyNote}
+            </Text>
           </ResultCard>
 
           <ResultCard title="D. Confirmation Form">
-            <Input label="Medicine name" value={form.medicineName} onChangeText={(value) => setFormValue(setForm, "medicineName", value)} />
-            <Input label="Strength" value={form.strength} onChangeText={(value) => setFormValue(setForm, "strength", value)} />
-            <OptionGroup label="Frequency" value={form.frequency} options={frequencyOptions} onChange={(value) => setFormValue(setForm, "frequency", value)} />
-            <OptionGroup label="Meal timing" value={form.mealTiming} options={mealTimingOptions} onChange={(value) => setFormValue(setForm, "mealTiming", value)} />
-            <Input label="Start date" value={form.startDate} onChangeText={(value) => setFormValue(setForm, "startDate", value)} placeholder="YYYY-MM-DD" />
-            <Input label="End date optional" value={form.endDate} onChangeText={(value) => setFormValue(setForm, "endDate", value)} placeholder="YYYY-MM-DD" />
-            <Input label="Instruction text optional" value={form.instruction} onChangeText={(value) => setFormValue(setForm, "instruction", value)} multiline />
-            <Input label="Notes optional" value={form.notes} onChangeText={(value) => setFormValue(setForm, "notes", value)} multiline />
+            <Input
+              label="Medicine name"
+              value={form.medicineName}
+              onChangeText={(value) => setFormValue(setForm, "medicineName", value)}
+            />
 
-            <Pressable style={styles.confirmRow} onPress={() => setConfirmed((value) => !value)}>
+            <Input
+              label="Strength"
+              value={form.strength}
+              onChangeText={(value) => setFormValue(setForm, "strength", value)}
+            />
+
+            <OptionGroup
+              label="Frequency"
+              value={form.frequency}
+              options={frequencyOptions}
+              onChange={(value) => setFormValue(setForm, "frequency", value)}
+            />
+
+            <OptionGroup
+              label="Meal timing"
+              value={form.mealTiming}
+              options={mealTimingOptions}
+              onChange={(value) => setFormValue(setForm, "mealTiming", value)}
+            />
+
+            <Input
+              label="Start date"
+              value={form.startDate}
+              onChangeText={(value) => setFormValue(setForm, "startDate", value)}
+              placeholder="YYYY-MM-DD"
+            />
+
+            <Input
+              label="End date optional"
+              value={form.endDate}
+              onChangeText={(value) => setFormValue(setForm, "endDate", value)}
+              placeholder="YYYY-MM-DD"
+            />
+
+            <Input
+              label="Instruction text optional"
+              value={form.instruction}
+              onChangeText={(value) => setFormValue(setForm, "instruction", value)}
+              multiline
+            />
+
+            <Input
+              label="Notes optional"
+              value={form.notes}
+              onChangeText={(value) => setFormValue(setForm, "notes", value)}
+              multiline
+            />
+
+            <Pressable
+              style={styles.confirmRow}
+              onPress={() => setConfirmed((value) => !value)}
+            >
               <View style={[styles.checkbox, confirmed && styles.checkboxChecked]} />
               <Text style={styles.confirmText}>
                 I have manually confirmed the medicine name, dosage strength, frequency, meal timing, and start date.
               </Text>
             </Pressable>
 
-            <Pressable style={styles.primaryButton} onPress={handleSave} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Confirm and Add to Schedule</Text>}
+            <Pressable
+              style={styles.primaryButton}
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Confirm and Add to Schedule</Text>
+              )}
             </Pressable>
           </ResultCard>
         </>
@@ -314,18 +389,21 @@ function createEmptyForm() {
 }
 
 function createFormFromScan(result) {
-  const medicine = result.matchedMedicine;
-  const ocr = result.ocrResult || {};
+  const firstMedicine = result?.extractedMedications?.[0] || {};
 
   return {
-    medicineName: medicine?.genericName || ocr.possibleMedicineName || "",
-    strength: medicine?.strength || ocr.possibleStrength || "",
-    frequency: normalizeFrequency(ocr.possibleFrequency),
-    mealTiming: normalizeMealTiming(ocr.possibleMealTiming),
+    medicineName:
+      firstMedicine.genericName ||
+      firstMedicine.name ||
+      firstMedicine.rawName ||
+      "",
+    strength: firstMedicine.strength || "",
+    frequency: normalizeFrequency(firstMedicine.frequency),
+    mealTiming: "",
     startDate: new Date().toISOString().slice(0, 10),
     endDate: "",
-    instruction: ocr.possibleInstruction || "",
-    notes: ""
+    instruction: firstMedicine.dosage || "",
+    notes: result?.safetyNote || ""
   };
 }
 
