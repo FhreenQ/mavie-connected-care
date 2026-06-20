@@ -16,6 +16,7 @@ const adminRoutes = require("./routes/admin.routes");
 const drugInteractionRoutes = require("./routes/drugInteractionRoutes");
 const prescriptionScanRoutes = require("./routes/prescriptionScanRoutes");
 const mfdsRoutes = require("./routes/mfds.routes");
+const koreanMedicineScanRoutes = require("./routes/koreanMedicineScan.routes");
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use("/health-profile", healthProfileRoutes);
 app.use("/hospital", hospitalRoutes);
 app.use("/admin", adminRoutes);
 app.use("/mfds", mfdsRoutes);
+app.use("/korean-medicine-label", koreanMedicineScanRoutes);
 
 const PORT = Number(process.env.PORT) || 5000;
 

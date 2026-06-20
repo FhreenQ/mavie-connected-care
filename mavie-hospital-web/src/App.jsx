@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import "./App.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://10.121.159.39:5000";
 const DEV_EMAIL = import.meta.env.VITE_DEV_EMAIL || "hospital@mavie.com";
 const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD || "hospital123";
 
@@ -169,8 +169,10 @@ async function apiRequest(path, options = {}) {
     return () => clearInterval(interval);
   }, [token]);
 
+  const closedStatuses = ["Rejected", "Resolved", "Cancelled", "Acknowledged"];
+
   const activeEvents = events.filter(
-    (event) => event.status !== "Rejected" && event.status !== "Resolved"
+    (event) => !closedStatuses.includes(event.status)
   );
 
   return (

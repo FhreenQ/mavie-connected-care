@@ -5,8 +5,8 @@
 // IMPORTANT:
 // Do NOT use localhost when testing on your phone.
 // Use your laptop Wi-Fi IPv4 address.
-// Example: http://10.121.151.226:5000
-export const API_BASE_URL = "http://192.168.0.26:5000";
+// Example: http://10.121.159.39:5000
+export const API_BASE_URL = "http://10.121.159.39:5000";
 
 type ApiOptions = {
   method?: string;
@@ -188,9 +188,9 @@ export async function scanPrescriptionImage(imageUri: string) {
   const response = await fetch(`${API_BASE_URL}/prescriptions/scan-and-check`, {
     method: "POST",
     body: formData,
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+    // headers: {
+    //   "Content-Type": "multipart/form-data",
+    // },
   });
 
   if (!response.ok) {
