@@ -1,4 +1,5 @@
 import { Alert } from "react-native";
+import { syncMedicationReminders } from "../../services/medicationReminderNotifications";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const DEV_EMAIL = process.env.EXPO_PUBLIC_DEV_EMAIL;
@@ -42,7 +43,7 @@ function buildNextDoseTime(startDate) {
 
   // For now, we set first dose time to 9 AM Korea time.
   // Later, we can add a time picker in the app.
-  return `${safeDate}T09:00:00+09:00`;
+  return `${safeDate}T19:00:00+09:00`;
 }
 
 async function loginForDevToken() {
@@ -154,6 +155,14 @@ export async function saveUserMedication(payload) {
       nextDoseTime,
     }),
   });
+
+  // Refresh notification reminders after saving medicine
+  try {
+    const latestSchedules = await getUserMedications();
+    await syncMedicationReminders(latestSchedules);
+  } catch (notificationError) {
+    console.log("Medication saved, but reminder sync failed:", notificationError);
+  }
 
   return scheduleResponse.schedule;
 }

@@ -8,8 +8,15 @@ import "react-native-reanimated";
 import { AuthProvider } from "@/context/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
+import { useEffect } from "react";
+import { setupMedicationNotifications } from "../services/medicationReminderNotifications";
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    setupMedicationNotifications();
+  }, []);
 
   return (
     <AuthProvider>
@@ -22,11 +29,11 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="edit-health-profile" options={{ headerShown: false }} />
           <Stack.Screen name="emergency-contacts" options={{ headerShown: false }} />
-          
+
           <Stack.Screen name="add-medicine" options={{ headerShown: false }} />
           <Stack.Screen name="ai-medicine-scanner" options={{ headerShown: false }} />
           <Stack.Screen name="manual-medicine-input" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />\
+          <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
         </Stack>
 
         <StatusBar style="auto" />

@@ -1,6 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getUserMedications } from '../../components/medicine-scanner/medicineApi';
+import {
+  syncMedicationReminders,
+  scheduleTestMedicationReminder,
+} from '../../services/medicationReminderNotifications';
 
 import {
   Alert,
@@ -69,6 +73,9 @@ export default function App() {
   const loadBackendMedications = async () => {
     try {
       const schedules = await getUserMedications();
+
+      await syncMedicationReminders(schedules);
+
       const backendMedications = schedules.map(mapBackendScheduleToMedication);
       setMedications(backendMedications);
     } catch (error: any) {
@@ -351,6 +358,23 @@ function MedicationScreen({ medications, markMedication, openAddModal, openScann
         </View>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        onPress={async () => {
+          await scheduleTestMedicationReminder();
+          Alert.alert("Test scheduled", "Notification will appear in 10 seconds.");
+        }}
+        style={{
+          backgroundColor: "#0F8B8D",
+          padding: 14,
+          borderRadius: 12,
+          marginBottom: 16,
+        }}
+      >
+        <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+          Test Medication Reminder
+        </Text>
+      </TouchableOpacity>
+      
       {medications.map((med) => (
         <View key={med.id} style={styles.medCard}>
           <View style={styles.medHeaderRow}>
