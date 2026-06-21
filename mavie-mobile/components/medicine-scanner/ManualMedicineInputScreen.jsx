@@ -12,6 +12,7 @@ export default function ManualMedicineInputScreen({ navigation }) {
     frequency: "",
     mealTiming: "",
     startDate: new Date().toISOString().slice(0, 10),
+    reminderTime: "",
     endDate: "",
     notes: ""
   });
@@ -42,6 +43,7 @@ export default function ManualMedicineInputScreen({ navigation }) {
     instruction: "",
     notes: form.notes.trim(),
     startDate: form.startDate.trim(),
+    reminderTime: form.reminderTime.trim(),
     endDate: form.endDate.trim() || null,
     source: "MANUAL",
     confirmedByUser: true
@@ -81,6 +83,7 @@ export default function ManualMedicineInputScreen({ navigation }) {
         <OptionGroup label="Frequency" value={form.frequency} options={frequencyOptions} onChange={(value) => setFormValue(setForm, "frequency", value)} />
         <OptionGroup label="Meal timing" value={form.mealTiming} options={mealTimingOptions} onChange={(value) => setFormValue(setForm, "mealTiming", value)} />
         <Input label="Start date" value={form.startDate} onChangeText={(value) => setFormValue(setForm, "startDate", value)} placeholder="YYYY-MM-DD" />
+        <Input label="Reminder time" value={form.reminderTime} onChangeText={(value) => setFormValue(setForm, "reminderTime", value)} placeholder="HH:mm, example: 14:30"/>
         <Input label="End date optional" value={form.endDate} onChangeText={(value) => setFormValue(setForm, "endDate", value)} placeholder="YYYY-MM-DD" />
         <Input label="Notes optional" value={form.notes} onChangeText={(value) => setFormValue(setForm, "notes", value)} multiline />
 
@@ -153,8 +156,12 @@ function validateForm(form, confirmed) {
   if (!form.frequency) return "Please select the frequency.";
   if (!form.mealTiming) return "Please select the meal timing.";
   if (!form.startDate.trim()) return "Please enter the start date.";
+  if (!form.reminderTime.trim()) return "Please enter the reminder time.";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.reminderTime.trim())) {
+    return "Please enter reminder time in HH:mm format, for example 14:30.";
+  }
   if (!confirmed) return "Please tick the confirmation checkbox before saving.";
-  return "";
+    return "";
 }
 
 const styles = StyleSheet.create({

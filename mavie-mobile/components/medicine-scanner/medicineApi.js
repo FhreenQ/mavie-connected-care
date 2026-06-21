@@ -47,12 +47,16 @@ function makeManualMedicationId(medicineName, strength) {
   return `MANUAL-${safeName}-${safeStrength}`.slice(0, 20);
 }
 
-function buildNextDoseTime(startDate) {
+function buildNextDoseTime(startDate, reminderTime) {
   const safeDate = startDate || new Date().toISOString().slice(0, 10);
 
-  // The add-medicine screen currently has no time picker, so schedules start at 9 AM.
-  // A future time-picker can pass a full ISO date-time instead.
-  return `${safeDate}T09:00:00+09:00`;
+  const safeTime =
+    typeof reminderTime === "string" &&
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(reminderTime.trim())
+      ? reminderTime.trim()
+      : "09:00";
+
+  return `${safeDate}T${safeTime}:00+09:00`;
 }
 
 async function apiRequest(path, options = {}) {
@@ -121,7 +125,7 @@ export async function saveUserMedication(payload) {
       frequencyHours: getFrequencyHours(payload.frequency),
       startDate: payload.startDate,
       endDate: payload.endDate || null,
-      nextDoseTime: buildNextDoseTime(payload.startDate),
+      nextDoseTime: buildNextDoseTime(payload.startDate, payload.reminderTime),
     }),
   });
 
