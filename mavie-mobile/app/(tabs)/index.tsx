@@ -1,14 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useMemo, useState } from 'react';
-<<<<<<< HEAD
-import { useFocusEffect, useRouter } from 'expo-router';
-import { getUserMedications } from '../../components/medicine-scanner/medicineApi';
-import {
-  syncMedicationReminders,
-  scheduleTestMedicationReminder,
-} from '../../services/medicationReminderNotifications';
-=======
 import { router, useFocusEffect, useRouter } from 'expo-router';
 import {
   getMedicationLogs,
@@ -17,7 +9,7 @@ import {
   recordMedicationStatus,
   updateMedicationSchedule,
 } from '../../components/medicine-scanner/medicineApi';
->>>>>>> d44419e (Integrate realtime emergency pipeline and nurse dashboard updates)
+import { syncMedicationReminders } from '../../services/medicationReminderNotifications';
 
 import {
   Alert,
@@ -110,22 +102,15 @@ export default function App() {
 
   const loadBackendMedications = useCallback(async () => {
     try {
-<<<<<<< HEAD
-      const schedules = await getUserMedications();
-
-      await syncMedicationReminders(schedules);
-
-      const backendMedications = schedules.map(mapBackendScheduleToMedication);
-=======
       await markOverdueMedicationLogs();
       const [schedules, logs] = await Promise.all([
         getUserMedications(),
         getMedicationLogs(),
       ]);
+      await syncMedicationReminders(schedules);
       const backendMedications = schedules.map((schedule: any) =>
         mapBackendScheduleToMedication(schedule, logs)
       );
->>>>>>> d44419e (Integrate realtime emergency pipeline and nurse dashboard updates)
       setMedications(backendMedications);
     } catch (error: any) {
       console.log('Load backend medications error:', error);
@@ -494,28 +479,7 @@ function MedicationScreen({ medications, markMedication, openMedicationActions, 
         </View>
       </TouchableOpacity>
 
-<<<<<<< HEAD
-      <TouchableOpacity
-        onPress={async () => {
-          await scheduleTestMedicationReminder();
-          Alert.alert("Test scheduled", "Notification will appear in 10 seconds.");
-        }}
-        style={{
-          backgroundColor: "#0F8B8D",
-          padding: 14,
-          borderRadius: 12,
-          marginBottom: 16,
-        }}
-      >
-        <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-          Test Medication Reminder
-        </Text>
-      </TouchableOpacity>
-      
-      {medications.map((med) => (
-=======
       {medications.map((med: any) => (
->>>>>>> d44419e (Integrate realtime emergency pipeline and nurse dashboard updates)
         <View key={med.id} style={styles.medCard}>
           <View style={styles.medHeaderRow}>
             <View>
