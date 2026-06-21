@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Linking,
   TextInput,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { usePatients } from "../../../context/PatientContext";
 import { EmergencyContact } from "../../../data/mockNurseData";
+import { triggerPatientEmergencyAlert } from "../../../services/api";
 
 export default function EmergencyContactsScreen() {
   const { id } = useLocalSearchParams();
@@ -77,7 +79,7 @@ export default function EmergencyContactsScreen() {
     setIsAdding(false);
   };
 
-  const handleSaveContact = () => {
+  const handleSaveContact = async () => {
     if (!name || !relationship || !phone) {
       Alert.alert(
         "Missing Information",
@@ -92,15 +94,18 @@ export default function EmergencyContactsScreen() {
       phone,
     };
 
-    if (editingIndex !== null) {
-      updateEmergencyContactAtIndex(patient.id, editingIndex, contact);
-      Alert.alert("Saved", "Emergency contact has been updated.");
-    } else {
-      addEmergencyContact(patient.id, contact);
-      Alert.alert("Saved", "New emergency contact has been added.");
+    try {
+      if (editingIndex !== null) {
+        await updateEmergencyContactAtIndex(patient.id, editingIndex, contact);
+        Alert.alert("Saved", "Emergency contact has been updated.");
+      } else {
+        await addEmergencyContact(patient.id, contact);
+        Alert.alert("Saved", "New emergency contact has been added.");
+      }
+      resetForm();
+    } catch (error) {
+      Alert.alert("Save failed", error instanceof Error ? error.message : "Unable to save emergency contact.");
     }
-
-    resetForm();
   };
 
   const handleDeleteContact = (index: number) => {
@@ -115,33 +120,49 @@ export default function EmergencyContactsScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => deleteEmergencyContact(patient.id, index),
+          onPress: async () => {
+            try {
+              await deleteEmergencyContact(patient.id, index);
+            } catch (error) {
+              Alert.alert("Delete failed", error instanceof Error ? error.message : "Unable to delete emergency contact.");
+            }
+          },
         },
       ]
     );
   };
 
-  const handleEmergencyAlert = () => {
-    const contactList =
-      contacts.length > 0
-        ? contacts
-            .map(
-              (contact) =>
-                `${contact.name} (${contact.relationship}) - ${contact.phone}`
-            )
-            .join("\n")
-        : "No emergency contacts added.";
-
-    Alert.alert(
-      "Emergency Alert Sent",
-      `Emergency alert sent for ${patient.name}.\n\nContacts notified:\n${contactList}`
-    );
+  const handleEmergencyAlert = async () => {
+    try {
+      const result = await triggerPatientEmergencyAlert(patient.id, {
+        locationText: patient.room,
+        details: `Emergency alert initiated by nurse for ${patient.name}.`,
+      });
+      Alert.alert(
+        "Emergency Alert Sent",
+        `Emergency event #${result.event.emergency_event_id} was recorded. ${result.alertsCreated} notification record(s) were created.`
+      );
+    } catch (error) {
+      Alert.alert("Emergency alert failed", error instanceof Error ? error.message : "Please try again.");
+    }
   };
 
   const handleCallEmergency = () => {
     Alert.alert(
-      "Emergency Call",
-      "This is a demo button. Later, this can connect to emergency calling or hospital alert API."
+      "Call Emergency Support",
+      "Call Korean emergency services (119)?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Call 119",
+          style: "destructive",
+          onPress: () => {
+            Linking.openURL("tel:119").catch(() => {
+              Alert.alert("Call unavailable", "Emergency calling is not available on this device.");
+            });
+          },
+        },
+      ]
     );
   };
 

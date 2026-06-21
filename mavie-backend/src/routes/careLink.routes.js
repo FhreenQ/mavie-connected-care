@@ -1,10 +1,13 @@
 const express = require("express");
 const pool = require("../db");
 const authMiddleware = require("../middleware/auth.middleware");
+const { requireNurseAppRole } = require("../middleware/nurseRole.middleware");
 
 const router = express.Router();
 
 const allowedRelationships = ["Family", "Caregiver", "Nurse", "Guardian", "Other"];
+
+router.use(authMiddleware, requireNurseAppRole);
 
 // Create caregiver-patient link
 router.post("/", authMiddleware, async (req, res) => {
@@ -45,6 +48,12 @@ router.post("/", authMiddleware, async (req, res) => {
     }
 
     const patient = patientResult.rows[0];
+
+    if (String(patient.role || "").toLowerCase() !== "patient") {
+      return res.status(400).json({
+        message: "Only patient accounts can be added to a nurse care list.",
+      });
+    }
 
     if (patient.user_id === req.user.userId) {
       return res.status(400).json({

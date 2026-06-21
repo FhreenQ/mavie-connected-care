@@ -48,24 +48,27 @@ export default function EditPatientProfileScreen() {
     );
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name || !age || !condition) {
       Alert.alert("Missing Information", "Please fill in name, age, and condition.");
       return;
     }
 
-    updatePatient(patient.id, {
-      name,
-      age,
-      gender,
-      condition,
-      room,
-      allergies,
-      emergencyContact,
-      notes,
-    });
-
-    router.replace(`/patient/${patient.id}` as any);
+    try {
+      await updatePatient(patient.id, {
+        name,
+        age,
+        gender,
+        condition,
+        room,
+        allergies,
+        emergencyContact,
+        notes,
+      });
+      router.replace(`/patient/${patient.id}` as any);
+    } catch (error) {
+      Alert.alert("Save failed", error instanceof Error ? error.message : "Unable to save patient information.");
+    }
   };
 
   return (

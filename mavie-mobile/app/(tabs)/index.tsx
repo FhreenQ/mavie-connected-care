@@ -1,13 +1,27 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useMemo, useState } from 'react';
+<<<<<<< HEAD
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getUserMedications } from '../../components/medicine-scanner/medicineApi';
 import {
   syncMedicationReminders,
   scheduleTestMedicationReminder,
 } from '../../services/medicationReminderNotifications';
+=======
+import { router, useFocusEffect, useRouter } from 'expo-router';
+import {
+  getMedicationLogs,
+  getUserMedications,
+  markOverdueMedicationLogs,
+  recordMedicationStatus,
+  updateMedicationSchedule,
+} from '../../components/medicine-scanner/medicineApi';
+>>>>>>> d44419e (Integrate realtime emergency pipeline and nurse dashboard updates)
 
 import {
   Alert,
+  Image,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -22,11 +36,11 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { getHealthProfile, getEmergencyContacts, triggerEmergencyAlert } from "@/services/api";
 
-import { router } from "expo-router";
 
-const initialMedications = [];
+const initialMedications: any[] = [];
+const PROFILE_PHOTO_PREFIX = 'mavie_profile_photo_';
 
-function mapBackendScheduleToMedication(schedule: any) {
+function mapBackendScheduleToMedication(schedule: any, logs: any[]) {
   const nextDoseDate = schedule.next_dose_time
     ? new Date(schedule.next_dose_time)
     : null;
@@ -38,6 +52,18 @@ function mapBackendScheduleToMedication(schedule: any) {
       })
     : 'No time';
 
+  const doseLog = logs
+    .filter(
+      (log) =>
+        String(log.schedule_id) === String(schedule.schedule_id) &&
+        new Date(log.scheduled_time).getTime() === new Date(schedule.next_dose_time).getTime()
+    )
+    .sort(
+      (first, second) =>
+        new Date(second.created_at || second.scheduled_time).getTime() -
+        new Date(first.created_at || first.scheduled_time).getTime()
+    )[0];
+
   return {
     id: String(schedule.schedule_id),
     name: schedule.brand_name || schedule.generic_name || 'Unknown medicine',
@@ -45,7 +71,9 @@ function mapBackendScheduleToMedication(schedule: any) {
     time,
     instruction: schedule.instructions || 'No instruction added',
     benefit: 'Saved from backend schedule',
-    status: 'Pending',
+    status: doseLog?.status === 'Taken' ? 'Taken' : doseLog ? 'Skipped' : 'Pending',
+    scheduledTime: schedule.next_dose_time,
+    frequencyHours: schedule.frequency_hours,
   };
 }
 
@@ -56,6 +84,16 @@ export default function App() {
   const [medications, setMedications] = useState(initialMedications);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showMedicationActions, setShowMedicationActions] = useState(false);
+  const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+  const [selectedMedication, setSelectedMedication] = useState<any>(null);
+  const [savingMedication, setSavingMedication] = useState(false);
+  const [scheduleDraft, setScheduleDraft] = useState({
+    dosage: '',
+    instructions: '',
+    frequencyHours: '24',
+    nextDoseTime: '',
+  });
 
   const [newMed, setNewMed] = useState({
     name: '',
@@ -70,13 +108,24 @@ export default function App() {
   const [healthProfile, setHealthProfile] = useState<any>(null);
   const [emergencyContacts, setEmergencyContacts] = useState<any[]>([]);
 
-  const loadBackendMedications = async () => {
+  const loadBackendMedications = useCallback(async () => {
     try {
+<<<<<<< HEAD
       const schedules = await getUserMedications();
 
       await syncMedicationReminders(schedules);
 
       const backendMedications = schedules.map(mapBackendScheduleToMedication);
+=======
+      await markOverdueMedicationLogs();
+      const [schedules, logs] = await Promise.all([
+        getUserMedications(),
+        getMedicationLogs(),
+      ]);
+      const backendMedications = schedules.map((schedule: any) =>
+        mapBackendScheduleToMedication(schedule, logs)
+      );
+>>>>>>> d44419e (Integrate realtime emergency pipeline and nurse dashboard updates)
       setMedications(backendMedications);
     } catch (error: any) {
       console.log('Load backend medications error:', error);
@@ -85,9 +134,9 @@ export default function App() {
         error.message || 'Could not load medications from backend.'
       );
     }
-  };
+  }, []);
 
-  const loadUserProfile = async () => {
+  const loadUserProfile = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -105,13 +154,13 @@ export default function App() {
       console.log('No emergency contacts yet:', error.message);
       setEmergencyContacts([]);
     }
-  };
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
       loadBackendMedications();
       loadUserProfile();
-    }, [token])
+    }, [loadBackendMedications, loadUserProfile])
   );
 
   const stats = useMemo(() => {
@@ -127,10 +176,76 @@ export default function App() {
     return { taken, skipped, pending, adherence };
   }, [medications]);
 
-  const markMedication = (id, status) => {
-    setMedications((prev) =>
-      prev.map((med) => (med.id === id ? { ...med, status } : med))
-    );
+  const markMedication = async (id: string, status: 'Taken' | 'Skipped') => {
+    const medication = medications.find((med: any) => med.id === id);
+
+    if (!medication?.scheduledTime) {
+      Alert.alert('Medication unavailable', 'Please refresh the medication list and try again.');
+      return;
+    }
+
+    try {
+      setSavingMedication(true);
+      await recordMedicationStatus({
+        scheduleId: medication.id,
+        scheduledTime: medication.scheduledTime,
+        status,
+        note: status === 'Taken' ? 'Confirmed by patient' : 'Marked skipped by patient',
+      });
+      setShowMedicationActions(false);
+      await loadBackendMedications();
+    } catch (error: any) {
+      Alert.alert('Status update failed', error.message || 'Please try again.');
+    } finally {
+      setSavingMedication(false);
+    }
+  };
+
+  const openMedicationActions = (medication: any) => {
+    setSelectedMedication(medication);
+    setShowMedicationActions(true);
+  };
+
+  const openScheduleEditor = () => {
+    if (!selectedMedication) return;
+
+    const date = new Date(selectedMedication.scheduledTime);
+    setScheduleDraft({
+      dosage: selectedMedication.dose || '',
+      instructions: selectedMedication.instruction || '',
+      frequencyHours: String(selectedMedication.frequencyHours || 24),
+      nextDoseTime: Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16),
+    });
+    setShowMedicationActions(false);
+    setShowScheduleEditor(true);
+  };
+
+  const saveScheduleChanges = async () => {
+    if (!selectedMedication) return;
+
+    const nextDoseTime = new Date(scheduleDraft.nextDoseTime);
+    const frequencyHours = Number(scheduleDraft.frequencyHours);
+
+    if (!scheduleDraft.dosage.trim() || !Number.isFinite(nextDoseTime.getTime()) || frequencyHours <= 0) {
+      Alert.alert('Check the information', 'Enter a dose, valid date and time, and positive frequency.');
+      return;
+    }
+
+    try {
+      setSavingMedication(true);
+      await updateMedicationSchedule(selectedMedication.id, {
+        dosage: scheduleDraft.dosage.trim(),
+        instructions: scheduleDraft.instructions.trim(),
+        frequencyHours,
+        nextDoseTime: nextDoseTime.toISOString(),
+      });
+      setShowScheduleEditor(false);
+      await loadBackendMedications();
+    } catch (error: any) {
+      Alert.alert('Schedule update failed', error.message || 'Please try again.');
+    } finally {
+      setSavingMedication(false);
+    }
   };
 
   const addMedication = () => {
@@ -231,18 +346,9 @@ export default function App() {
         <MedicationScreen
           medications={medications}
           markMedication={markMedication}
+          openMedicationActions={openMedicationActions}
           openAddModal={() => router.push('/add-medicine' as any)}
           openScanner={() => router.push('/add-medicine' as any)}
-        />
-      );
-    }
-
-    if (activeTab === 'Caregiver') {
-      return (
-        <CaregiverScreen
-          medications={medications}
-          stats={stats}
-          patientInfo={patientInfo}
         />
       );
     }
@@ -256,7 +362,7 @@ export default function App() {
       );
     }
 
-    return <ProfileScreen patientInfo={patientInfo} logout={logout} />;
+    return <ProfileScreen patientInfo={patientInfo} logout={logout} userId={user?.userId} />;
   };
 
   return (
@@ -281,12 +387,32 @@ export default function App() {
         onCancel={() => setShowEmergencyModal(false)}
         onConfirm={triggerEmergency}
       />
+
+      <MedicationActionsModal
+        visible={showMedicationActions}
+        medication={selectedMedication}
+        saving={savingMedication}
+        onClose={() => setShowMedicationActions(false)}
+        onTaken={() => selectedMedication && markMedication(selectedMedication.id, 'Taken')}
+        onSkipped={() => selectedMedication && markMedication(selectedMedication.id, 'Skipped')}
+        onEdit={openScheduleEditor}
+      />
+
+      <ScheduleEditorModal
+        visible={showScheduleEditor}
+        medication={selectedMedication}
+        draft={scheduleDraft}
+        saving={savingMedication}
+        onChange={setScheduleDraft}
+        onClose={() => setShowScheduleEditor(false)}
+        onSave={saveScheduleChanges}
+      />
     </SafeAreaView>
   );
 }
 
-function HomeScreen({ stats, medications, setActiveTab, patientInfo }) {
-  const nextMedication = medications.find((med) => med.status === 'Pending');
+function HomeScreen({ stats, medications, setActiveTab, patientInfo }: any) {
+  const nextMedication = medications.find((med: any) => med.status === 'Pending');
 
   return (
     <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
@@ -304,8 +430,18 @@ function HomeScreen({ stats, medications, setActiveTab, patientInfo }) {
 
       <View style={styles.statsGrid}>
         <StatCard label="Taken" value={stats.taken} emoji="✅" />
-        <StatCard label="Pending" value={stats.pending} emoji="⏰" />
-        <StatCard label="Skipped" value={stats.skipped} emoji="⚠️" />
+        <StatCard
+          label="Pending"
+          value={stats.pending}
+          emoji="⏰"
+          onPress={() => router.push({ pathname: '/medication-status', params: { status: 'Pending' } } as any)}
+        />
+        <StatCard
+          label="Skipped"
+          value={stats.skipped}
+          emoji="⚠️"
+          onPress={() => router.push({ pathname: '/medication-status', params: { status: 'Skipped' } } as any)}
+        />
         <StatCard label="Adherence" value={`${stats.adherence}%`} emoji="📊" />
       </View>
 
@@ -334,7 +470,7 @@ function HomeScreen({ stats, medications, setActiveTab, patientInfo }) {
   );
 }
 
-function MedicationScreen({ medications, markMedication, openAddModal, openScanner }) {
+function MedicationScreen({ medications, markMedication, openMedicationActions, openAddModal, openScanner }: any) {
   return (
     <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
       <View style={styles.topRow}>
@@ -358,6 +494,7 @@ function MedicationScreen({ medications, markMedication, openAddModal, openScann
         </View>
       </TouchableOpacity>
 
+<<<<<<< HEAD
       <TouchableOpacity
         onPress={async () => {
           await scheduleTestMedicationReminder();
@@ -376,77 +513,54 @@ function MedicationScreen({ medications, markMedication, openAddModal, openScann
       </TouchableOpacity>
       
       {medications.map((med) => (
+=======
+      {medications.map((med: any) => (
+>>>>>>> d44419e (Integrate realtime emergency pipeline and nurse dashboard updates)
         <View key={med.id} style={styles.medCard}>
           <View style={styles.medHeaderRow}>
             <View>
               <Text style={styles.medName}>{med.name}</Text>
               <Text style={styles.medDetails}>{med.dose} • {med.time}</Text>
             </View>
-            <StatusPill status={med.status} />
+            <View style={styles.medStatusRow}>
+              <StatusPill status={med.status} />
+              {med.status !== 'Pending' && (
+                <TouchableOpacity
+                  accessibilityLabel={`Edit ${med.name}`}
+                  style={styles.moreButton}
+                  onPress={() => openMedicationActions(med)}
+                >
+                  <Text style={styles.moreButtonText}>...</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           <Text style={styles.medInstruction}>When: {med.instruction}</Text>
           <Text style={styles.medBenefit}>Benefit: {med.benefit}</Text>
 
-          <View style={styles.medActionRow}>
-            <TouchableOpacity
-              style={styles.takenButton}
-              onPress={() => markMedication(med.id, 'Taken')}
-            >
-              <Text style={styles.takenButtonText}>Taken</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={() => markMedication(med.id, 'Skipped')}
-            >
-              <Text style={styles.skipButtonText}>Skipped</Text>
-            </TouchableOpacity>
-          </View>
+          {med.status === 'Pending' && (
+            <View style={styles.medActionRow}>
+              <TouchableOpacity
+                style={styles.takenButton}
+                onPress={() => markMedication(med.id, 'Taken')}
+              >
+                <Text style={styles.takenButtonText}>Taken</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={() => markMedication(med.id, 'Skipped')}
+              >
+                <Text style={styles.skipButtonText}>Skipped</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       ))}
     </ScrollView>
   );
 }
 
-function CaregiverScreen({ medications, stats, patientInfo }) {
-  const missedMeds = medications.filter((med) => med.status === 'Skipped');
-
-  return (
-    <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
-      <Text style={styles.pageTitle}>Caregiver Dashboard</Text>
-      <Text style={styles.pageSubtitle}>Monitor patient medication status</Text>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Patient summary</Text>
-        <Text style={styles.infoText}>Name: {patientInfo.name}</Text>
-        <Text style={styles.infoText}>Condition: {patientInfo.condition}</Text>
-        <Text style={styles.infoText}>Today&apos;s adherence: {stats.adherence}%</Text>
-      </View>
-
-      <View style={styles.statsGrid}>
-        <StatCard label="Taken" value={stats.taken} emoji="✅" />
-        <StatCard label="Pending" value={stats.pending} emoji="⏰" />
-        <StatCard label="Skipped" value={stats.skipped} emoji="⚠️" />
-        <StatCard label="Total" value={medications.length} emoji="💊" />
-      </View>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Missed medication alerts</Text>
-        {missedMeds.length === 0 ? (
-          <Text style={styles.emptyText}>No missed medication recorded.</Text>
-        ) : (
-          missedMeds.map((med) => (
-            <View key={med.id} style={styles.alertBox}>
-              <Text style={styles.alertTitle}>{med.name} was skipped</Text>
-              <Text style={styles.alertText}>{med.dose} scheduled at {med.time}</Text>
-            </View>
-          ))
-        )}
-      </View>
-    </ScrollView>
-  );
-}
-
-function EmergencyScreen({ openEmergency, emergencyContacts }) {
+function EmergencyScreen({ openEmergency, emergencyContacts }: any) {
   return (
     <ScrollView style={styles.screen}>
       <View style={styles.emergencyCard}>
@@ -511,11 +625,47 @@ function EmergencyScreen({ openEmergency, emergencyContacts }) {
   );
 }
 
-function ProfileScreen({ patientInfo, logout }) {
+function ProfileScreen({ patientInfo, logout, userId }: any) {
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const photoStorageKey = `${PROFILE_PHOTO_PREFIX}${userId || 'unknown'}`;
+
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem(photoStorageKey).then(setPhotoUri);
+    }, [photoStorageKey])
+  );
+
+  const chooseProfilePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Photo permission needed', 'Allow photo access to choose a profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      await AsyncStorage.setItem(photoStorageKey, result.assets[0].uri);
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
   return (
     <ScrollView style={styles.screen}>
       <View style={styles.profileCard}>
-        <Text style={styles.avatar}>👤</Text>
+        <TouchableOpacity onPress={chooseProfilePhoto} accessibilityLabel="Change profile photo">
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatar}>👤</Text>
+          )}
+        </TouchableOpacity>
         <Text style={styles.profileName}>{patientInfo.name}</Text>
         <Text style={styles.profileSubtext}>{patientInfo.email}</Text>
         <Text style={styles.profileSubtext}>Role: {patientInfo.role}</Text>
@@ -549,17 +699,17 @@ function ProfileScreen({ patientInfo, logout }) {
   );
 }
 
-function AddMedicationModal({ visible, newMed, setNewMed, onClose, onSave }) {
+function AddMedicationModal({ visible, newMed, setNewMed, onClose, onSave }: any) {
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Add medication</Text>
-          <Input label="Medicine name" value={newMed.name} onChangeText={(text) => setNewMed({ ...newMed, name: text })} placeholder="Example: Paracetamol" />
-          <Input label="Dose" value={newMed.dose} onChangeText={(text) => setNewMed({ ...newMed, dose: text })} placeholder="Example: 500 mg" />
-          <Input label="Time" value={newMed.time} onChangeText={(text) => setNewMed({ ...newMed, time: text })} placeholder="Example: 08:00 AM" />
-          <Input label="Instruction" value={newMed.instruction} onChangeText={(text) => setNewMed({ ...newMed, instruction: text })} placeholder="Example: After meal" />
-          <Input label="Benefit" value={newMed.benefit} onChangeText={(text) => setNewMed({ ...newMed, benefit: text })} placeholder="Example: Reduces fever" />
+          <Input label="Medicine name" value={newMed.name} onChangeText={(text: string) => setNewMed({ ...newMed, name: text })} placeholder="Example: Paracetamol" />
+          <Input label="Dose" value={newMed.dose} onChangeText={(text: string) => setNewMed({ ...newMed, dose: text })} placeholder="Example: 500 mg" />
+          <Input label="Time" value={newMed.time} onChangeText={(text: string) => setNewMed({ ...newMed, time: text })} placeholder="Example: 08:00 AM" />
+          <Input label="Instruction" value={newMed.instruction} onChangeText={(text: string) => setNewMed({ ...newMed, instruction: text })} placeholder="Example: After meal" />
+          <Input label="Benefit" value={newMed.benefit} onChangeText={(text: string) => setNewMed({ ...newMed, benefit: text })} placeholder="Example: Reduces fever" />
 
           <View style={styles.modalActions}>
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -575,7 +725,7 @@ function AddMedicationModal({ visible, newMed, setNewMed, onClose, onSave }) {
   );
 }
 
-function EmergencyModal({ visible, onCancel, onConfirm }) {
+function EmergencyModal({ visible, onCancel, onConfirm }: any) {
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.modalOverlay}>
@@ -599,11 +749,82 @@ function EmergencyModal({ visible, onCancel, onConfirm }) {
   );
 }
 
-function BottomNavigation({ activeTab, setActiveTab }) {
+function MedicationActionsModal({ visible, medication, saving, onClose, onTaken, onSkipped, onEdit }: any) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>{medication?.name || 'Medication'}</Text>
+          <Text style={styles.modalDescription}>Update the medicine status or its schedule details.</Text>
+          <TouchableOpacity style={styles.actionMenuButton} disabled={saving} onPress={onTaken}>
+            <Text style={styles.actionMenuButtonText}>Mark as Taken</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionMenuButton} disabled={saving} onPress={onSkipped}>
+            <Text style={styles.actionMenuButtonText}>Mark as Skipped</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionMenuButton} disabled={saving} onPress={onEdit}>
+            <Text style={styles.actionMenuButtonText}>Edit Medicine Schedule</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelButton} disabled={saving} onPress={onClose}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ScheduleEditorModal({ visible, medication, draft, saving, onChange, onClose, onSave }: any) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <ScrollView contentContainerStyle={styles.modalScroll}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit {medication?.name}</Text>
+            <Text style={styles.modalDescription}>Update the dose, instructions, frequency, or next dose time.</Text>
+            <Input
+              label="Dose"
+              value={draft.dosage}
+              onChangeText={(dosage: string) => onChange({ ...draft, dosage })}
+              placeholder="Example: 500 mg"
+            />
+            <Input
+              label="Instructions"
+              value={draft.instructions}
+              onChangeText={(instructions: string) => onChange({ ...draft, instructions })}
+              placeholder="Example: After meal"
+            />
+            <Input
+              label="Frequency in hours"
+              value={draft.frequencyHours}
+              onChangeText={(frequencyHours: string) => onChange({ ...draft, frequencyHours })}
+              placeholder="24"
+            />
+            <Input
+              label="Next dose (YYYY-MM-DDTHH:MM)"
+              value={draft.nextDoseTime}
+              onChangeText={(nextDoseTime: string) => onChange({ ...draft, nextDoseTime })}
+              placeholder="2026-06-21T09:00"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelButton} disabled={saving} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} disabled={saving} onPress={onSave}>
+                <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function BottomNavigation({ activeTab, setActiveTab }: any) {
   const tabs = [
     { name: 'Home', icon: '🏠' },
     { name: 'Medication', icon: '💊' },
-    { name: 'Caregiver', icon: '👩‍⚕️' },
     { name: 'Emergency', icon: '🚨' },
     { name: 'Profile', icon: '👤' },
   ];
@@ -623,17 +844,17 @@ function BottomNavigation({ activeTab, setActiveTab }) {
   );
 }
 
-function StatCard({ emoji, label, value }) {
+function StatCard({ emoji, label, value, onPress }: any) {
   return (
-    <View style={styles.statCard}>
+    <TouchableOpacity style={styles.statCard} onPress={onPress} disabled={!onPress}>
       <Text style={styles.statEmoji}>{emoji}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function StatusPill({ status }) {
+function StatusPill({ status }: any) {
   const style =
     status === 'Taken'
       ? styles.statusTaken
@@ -648,7 +869,7 @@ function StatusPill({ status }) {
   );
 }
 
-function Input({ label, value, onChangeText, placeholder }) {
+function Input({ label, value, onChangeText, placeholder }: any) {
   return (
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -663,7 +884,7 @@ function Input({ label, value, onChangeText, placeholder }) {
   );
 }
 
-function InfoRow({ label, value }) {
+function InfoRow({ label, value }: any) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -894,6 +1115,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
   },
+  medStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   statusPill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -913,6 +1139,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#111827',
+  },
+  moreButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButtonText: {
+    color: '#374151',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: -6,
   },
   medActionRow: {
     flexDirection: 'row',
@@ -974,6 +1214,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
+  emergencyIcon: {
+    fontSize: 48,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   emergencyTitle: {
     fontSize: 24,
     fontWeight: '900',
@@ -1031,6 +1276,12 @@ const styles = StyleSheet.create({
   },
   avatar: {
     fontSize: 54,
+    marginBottom: 8,
+  },
+  avatarImage: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     marginBottom: 8,
   },
   profileName: {
@@ -1110,6 +1361,29 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  modalDescription: {
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalScroll: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
+  actionMenuButton: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  actionMenuButtonText: {
+    color: '#111827',
+    fontWeight: '800',
   },
   inputGroup: {
     marginBottom: 12,

@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { usePatients } from "../context/PatientContext";
@@ -20,17 +21,13 @@ export default function EditNurseProfileScreen() {
   const [ward, setWard] = useState(nurse.ward);
   const [shift, setShift] = useState(nurse.shift);
 
-  const handleSave = () => {
-    updateNurse({
-      name,
-      email,
-      phone,
-      department,
-      ward,
-      shift,
-    });
-
-    router.replace("/nurse-dashboard");
+  const handleSave = async () => {
+    try {
+      await updateNurse({ name, email, phone, department, ward, shift });
+      router.replace("/nurse-dashboard");
+    } catch (error) {
+      Alert.alert("Save failed", error instanceof Error ? error.message : "Unable to save nurse information.");
+    }
   };
 
   return (

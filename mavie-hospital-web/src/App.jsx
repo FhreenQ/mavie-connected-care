@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { io } from "socket.io-client";
 import {
   AlertTriangle,
   CheckCircle,
@@ -10,7 +11,7 @@ import {
 } from "lucide-react";
 import "./App.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://10.121.159.39:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://192.168.0.21:5000";
 const DEV_EMAIL = import.meta.env.VITE_DEV_EMAIL || "hospital@mavie.com";
 const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD || "hospital123";
 
@@ -70,7 +71,7 @@ async function apiRequest(path, options = {}) {
     }
   }
 
-  async function loadEvents(authToken = token) {
+  const loadEvents = useCallback(async (authToken = token) => {
     if (!authToken && !token) return;
 
     setLoading(true);
@@ -95,7 +96,7 @@ async function apiRequest(path, options = {}) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [token]);
 
   async function loadMedicationHistory(patientId, event) {
   setError("");
@@ -154,20 +155,49 @@ async function apiRequest(path, options = {}) {
   }
 
   useEffect(() => {
-    loginHospital();
+    const loginTimer = setTimeout(() => {
+      loginHospital();
+    }, 0);
+
+    return () => clearTimeout(loginTimer);
   }, []);
 
   useEffect(() => {
     if (!token) return;
 
-    loadEvents(token);
+    const initialLoadTimer = setTimeout(() => {
+      loadEvents(token);
+    }, 0);
 
     const interval = setInterval(() => {
       loadEvents(token);
     }, 5000);
 
-    return () => clearInterval(interval);
-  }, [token]);
+    return () => {
+      clearTimeout(initialLoadTimer);
+      clearInterval(interval);
+    };
+  }, [token, loadEvents]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const socket = io(API_BASE_URL, {
+      auth: { token },
+      transports: ["websocket"],
+      reconnection: true,
+    });
+    const refreshEvents = () => loadEvents(token);
+
+    socket.on("emergency:new", refreshEvents);
+    socket.on("emergency:updated", refreshEvents);
+
+    return () => {
+      socket.off("emergency:new", refreshEvents);
+      socket.off("emergency:updated", refreshEvents);
+      socket.disconnect();
+    };
+  }, [token, loadEvents]);
 
   const closedStatuses = ["Rejected", "Resolved", "Cancelled", "Acknowledged"];
 

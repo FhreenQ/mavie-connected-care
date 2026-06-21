@@ -12,22 +12,27 @@ import { router, useLocalSearchParams } from "expo-router";
 
 import { usePatients } from "../../../context/PatientContext";
 import MedicationCard from "../../../components/nurse/MedicationCard";
+import { triggerPatientEmergencyAlert } from "../../../services/api";
 
 export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams();
   const {
   patients,
   loadPatientMedicationData,
+  loadPatientProfileData,
   updateMedicationStatus,
 } = usePatients();
 
   const patient = patients.find((item) => item.id === String(id));
 
   useEffect(() => {
-   if (id) {
-     loadPatientMedicationData(String(id));
-   }
-  }, [id, loadPatientMedicationData]);
+    if (id) {
+      Promise.all([
+        loadPatientMedicationData(String(id)),
+        loadPatientProfileData(String(id)),
+      ]).catch(() => undefined);
+    }
+  }, [id, loadPatientMedicationData, loadPatientProfileData]);
 
   if (!patient) {
     return (
@@ -53,11 +58,16 @@ export default function PatientDetailScreen() {
     });
   };
 
-  const handleEmergencyAlert = () => {
-    Alert.alert(
-      "Emergency Alert",
-      `Emergency alert sent for ${patient.name}.`
-    );
+  const handleEmergencyAlert = async () => {
+    try {
+      const result = await triggerPatientEmergencyAlert(patient.id, {
+        locationText: patient.room,
+        details: `Emergency alert initiated by nurse for ${patient.name}.`,
+      });
+      Alert.alert("Emergency Alert Sent", `Emergency event #${result.event.emergency_event_id} was recorded. ${result.alertsCreated} notification record(s) were created.`);
+    } catch (error) {
+      Alert.alert("Emergency alert failed", error instanceof Error ? error.message : "Please try again.");
+    }
   };
 
   return (
@@ -96,9 +106,11 @@ export default function PatientDetailScreen() {
               key={index}
               medicine={medicine}
               showActions
-              onStatusChange={(status) =>
-                updateMedicationStatus(patient.id, index, status)
-              }
+              onStatusChange={(status) => {
+                updateMedicationStatus(patient.id, index, status).catch((error) => {
+                  Alert.alert("Medication update failed", error instanceof Error ? error.message : "Please try again.");
+                });
+              }}
             />
           ))
         )}
@@ -153,6 +165,13 @@ export default function PatientDetailScreen() {
             onPress={() => openPatientPage("/patient/[id]/emergency-contacts")}
           >
             <Text style={styles.featureText}>Emergency Contacts</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.featureButton}
+            onPress={() => openPatientPage("/patient/[id]/care-link")}
+          >
+            <Text style={styles.featureText}>Care Link Permissions</Text>
           </TouchableOpacity>
         </View>
 

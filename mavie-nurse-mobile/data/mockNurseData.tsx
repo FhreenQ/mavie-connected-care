@@ -12,9 +12,13 @@ export type Medicine = {
   dosage: string;
   time: string;
   status: "Taken" | "Pending" | "Missed";
+  scheduleId?: string;
+  scheduledTime?: string;
+  logId?: string;
 };
 
 export type EmergencyContact = {
+  id?: string;
   name: string;
   relationship: string;
   phone: string;
@@ -22,6 +26,12 @@ export type EmergencyContact = {
 
 export type Patient = {
   id: string;
+  linkId?: string;
+  relationship?: string;
+  canViewSchedule?: boolean;
+  canViewLogs?: boolean;
+  canManageSchedule?: boolean;
+  canReceiveEmergencyAlerts?: boolean;
   name: string;
   age: string;
   gender: string;
@@ -54,6 +64,7 @@ export const initialPatients: Patient[] = [
     room: "Room 201",
     medicationStatus: "2/3 taken today",
     emergencyContact: "Daughter - 0101234567",
+    emergencyContacts: [],
     allergies: "Penicillin",
     notes: "Needs assistance when walking.",
     medicines: [
@@ -86,6 +97,7 @@ export const initialPatients: Patient[] = [
     room: "Room 204",
     medicationStatus: "Missed morning dose",
     emergencyContact: "Son - 0109876543",
+    emergencyContacts: [],
     allergies: "None",
     notes: "Sometimes forgets medication schedule.",
     medicines: [
@@ -112,6 +124,7 @@ export const initialPatients: Patient[] = [
     room: "Room 305",
     medicationStatus: "All taken today",
     emergencyContact: "Wife - 01055556666",
+    emergencyContacts: [],
     allergies: "Seafood",
     notes: "Monitor blood pressure every morning.",
     medicines: [

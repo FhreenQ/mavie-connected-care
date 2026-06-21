@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const authMiddleware = require("../middleware/auth.middleware");
+const { publishEmergencyEvent } = require("../services/emergencyRealtime.service");
 
 const router = express.Router();
 
@@ -129,6 +130,10 @@ await pool.query(
   `,
   [eventStatus, responseStatus, req.user.userId, eventId]
 );
+
+      publishEmergencyEvent("emergency:updated", eventId).catch((error) => {
+        console.error("Emergency realtime publish failed:", error.message);
+      });
 
       res.json({
         message: `Emergency event ${responseStatus.toLowerCase()} successfully`,

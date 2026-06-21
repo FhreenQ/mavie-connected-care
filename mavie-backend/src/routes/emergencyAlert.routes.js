@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const authMiddleware = require("../middleware/auth.middleware");
+const { publishEmergencyEvent } = require("../services/emergencyRealtime.service");
 
 const router = express.Router();
 
@@ -81,6 +82,10 @@ router.post("/trigger", authMiddleware, async (req, res) => {
     }
 
     await client.query("COMMIT");
+
+    publishEmergencyEvent("emergency:new", emergencyEvent.emergency_event_id).catch((error) => {
+      console.error("Emergency realtime publish failed:", error.message);
+    });
 
     res.status(201).json({
       message: "Emergency alert triggered successfully",
@@ -207,6 +212,10 @@ router.put("/:eventId/acknowledge", authMiddleware, async (req, res) => {
       });
     }
 
+    publishEmergencyEvent("emergency:updated", result.rows[0].emergency_event_id).catch((error) => {
+      console.error("Emergency realtime publish failed:", error.message);
+    });
+
     res.json({
       message: "Emergency event acknowledged successfully",
       event: result.rows[0],
@@ -241,6 +250,10 @@ router.put("/:eventId/resolve", authMiddleware, async (req, res) => {
       });
     }
 
+    publishEmergencyEvent("emergency:updated", result.rows[0].emergency_event_id).catch((error) => {
+      console.error("Emergency realtime publish failed:", error.message);
+    });
+
     res.json({
       message: "Emergency event resolved successfully",
       event: result.rows[0],
@@ -274,6 +287,10 @@ router.put("/:eventId/cancel", authMiddleware, async (req, res) => {
         message: "Emergency event not found",
       });
     }
+
+    publishEmergencyEvent("emergency:updated", result.rows[0].emergency_event_id).catch((error) => {
+      console.error("Emergency realtime publish failed:", error.message);
+    });
 
     res.json({
       message: "Emergency event cancelled successfully",

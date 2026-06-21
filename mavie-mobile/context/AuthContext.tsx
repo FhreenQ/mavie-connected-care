@@ -1,5 +1,3 @@
-// context/AuthContext.tsx
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
@@ -37,9 +35,12 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
 const TOKEN_KEY = "mavie_auth_token";
 const USER_KEY = "mavie_auth_user";
+
+function isPatient(user: User | null | undefined) {
+  return String(user?.role || "").toLowerCase() === "patient";
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -50,18 +51,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadStoredAuth();
   }, []);
 
+  async function clearStoredAuth() {
+    setToken(null);
+    setUser(null);
+    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+  }
+
   async function loadStoredAuth() {
     try {
-      const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
-      const storedUser = await AsyncStorage.getItem(USER_KEY);
+      const [storedToken, storedUser] = await AsyncStorage.multiGet([TOKEN_KEY, USER_KEY]);
+      const tokenValue = storedToken[1];
+      const userValue = storedUser[1];
 
-      if (storedToken) {
-        setToken(storedToken);
+      if (!tokenValue || !userValue) return;
+
+      const parsedUser = JSON.parse(userValue) as User;
+      if (!isPatient(parsedUser)) {
+        await clearStoredAuth();
+        return;
       }
 
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
+      setToken(tokenValue);
+      setUser(parsedUser);
+    } catch {
+      await clearStoredAuth();
     } finally {
       setLoading(false);
     }
@@ -70,15 +83,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     const data = await loginRequest(email.trim(), password);
 
-    if (!data.token) {
-      throw new Error("Login succeeded, but no token was returned.");
+    if (!data.token || !data.user) {
+      throw new Error("Login succeeded, but account information was not returned.");
+    }
+
+    if (!isPatient(data.user)) {
+      throw new Error("This account is not a patient account. Please use the MaVie nurse app.");
     }
 
     setToken(data.token);
     setUser(data.user);
-
-    await AsyncStorage.setItem(TOKEN_KEY, data.token);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    await AsyncStorage.multiSet([
+      [TOKEN_KEY, data.token],
+      [USER_KEY, JSON.stringify(data.user)],
+    ]);
   }
 
   async function register(payload: RegisterPayload) {
@@ -86,30 +104,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: payload.username.trim(),
       email: payload.email.trim(),
       password: payload.password,
-      role: payload.role || "patient",
+      role: "patient",
       timezone: payload.timezone || "Asia/Seoul",
     });
   }
 
   async function logout() {
-    setToken(null);
-    setUser(null);
-
-    await AsyncStorage.removeItem(TOKEN_KEY);
-    await AsyncStorage.removeItem(USER_KEY);
+    await clearStoredAuth();
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        token,
-        user,
-        loading,
-        login,
-        register,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{ token, user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -117,10 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-
+  if (!context) throw new Error("useAuth must be used inside AuthProvider");
   return context;
 }

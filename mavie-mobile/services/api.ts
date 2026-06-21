@@ -5,8 +5,8 @@
 // IMPORTANT:
 // Do NOT use localhost when testing on your phone.
 // Use your laptop Wi-Fi IPv4 address.
-// Example: http://10.121.159.39:5000
-export const API_BASE_URL = "http://10.121.159.39:5000";
+// Example: http://192.168.0.21:5000
+export const API_BASE_URL = "http://192.168.0.21:5000";
 
 type ApiOptions = {
   method?: string;
